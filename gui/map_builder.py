@@ -33,6 +33,8 @@ tile_rotation: Dict[str, str] = {
     'tower': 'basic',
 }
 
+tile_rotation_reverse = dict((v, k) for k, v in tile_rotation.items())
+
 
 class TileWidget(QWidget):
     def __init__(self, tile: Tile):
@@ -48,6 +50,13 @@ class TileWidget(QWidget):
         Change the type of the Tile to the next in rotation
         """
         self.tile.tile_type = tile_rotation[self.tile.tile_type]
+        self.set_type_color(self.tile.tile_type)
+
+    def rotate_type_reverse(self) -> None:
+        """
+        Change the type of the Tile to the previous in rotation
+        """
+        self.tile.tile_type = tile_rotation_reverse[self.tile.tile_type]
         self.set_type_color(self.tile.tile_type)
 
     def change_to_type(self, tile_type: str) -> None:
@@ -75,6 +84,9 @@ class TileWidget(QWidget):
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.LeftButton:
             self.rotate_type()
+
+        elif event.button() == Qt.RightButton:
+            self.rotate_type_reverse()
 
 
 class Window(QMainWindow):
