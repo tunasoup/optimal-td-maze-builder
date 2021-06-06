@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Type
 
 import numpy as np
 from PyQt5.QtCore import Qt
@@ -6,13 +6,18 @@ from PyQt5.QtGui import QPalette, QColor, QMouseEvent
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox
 
+from utils.errors import ValidationError
+from utils.tile import Tile
+from utils.map_validation import MapValidator
+
 DEFAULT_SIZE = 6
 MINIMUM_SIZE = 2
 
 # todo: place these dicts somewhere else
 tile_colors: Dict[str, QColor] = {
     'basic': QColor('#82add5'),
-    'void': QColor('transparent'),  #1f2d3a
+    'unbuildable': QColor('#1f2d3a'),
+    'void': QColor('transparent'),
     'spawn': QColor('#ff0000'),
     'exit': QColor('green'),
     'tower': QColor('#348bab'),
@@ -20,7 +25,8 @@ tile_colors: Dict[str, QColor] = {
 }
 
 tile_rotation: Dict[str, str] = {
-    'basic': 'void',
+    'basic': 'unbuildable',
+    'unbuildable':  'void',
     'void': 'spawn',
     'spawn': 'exit',
     'exit': 'tower',
@@ -28,20 +34,21 @@ tile_rotation: Dict[str, str] = {
 }
 
 
-class Tile(QWidget):
-    def __init__(self):
-        super(Tile, self).__init__()
+class TileWidget(QWidget):
+    def __init__(self, tile: Tile):
+        super(TileWidget, self).__init__()
+
+        self.tile = tile
 
         self.setAutoFillBackground(True)
-        self.type = 'basic'
-        self.set_type_color(self.type)
+        self.set_type_color(self.tile.tile_type)
 
     def rotate_type(self) -> None:
         """
         Change the type of the Tile to the next in rotation
         """
-        self.type = tile_rotation[self.type]
-        self.set_type_color(self.type)
+        self.tile.tile_type = tile_rotation[self.tile.tile_type]
+        self.set_type_color(self.tile.tile_type)
 
     def change_to_type(self, tile_type: str) -> None:
         """
@@ -51,12 +58,12 @@ class Tile(QWidget):
             tile_type: a string of the new tile type
 
         """
-        self.type = tile_type
+        self.tile.tile_type = tile_type
         self.set_type_color(tile_type)
 
     def set_type_color(self, tile_type: str) -> None:
         """
-        Set the Tile's color to correspond with the given type
+        Set the TileWidget's color to correspond with the given type
 
         Args:
             tile_type: string of a tile type
@@ -71,11 +78,13 @@ class Tile(QWidget):
 
 
 class Window(QMainWindow):
-    def __init__(self):
+    def __init__(self, map_validator: MapValidator):
         super().__init__()
 
+        self.map_validator = map_validator
+
         self.setGeometry(300, 300, 600, 400)
-        self.setWindowTitle("PyQt5 window")
+        self.setWindowTitle("TD maze builder")
 
         main_layout = QGridLayout()
 
@@ -115,38 +124,51 @@ class Window(QMainWindow):
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
-        self.tiles = np.empty((DEFAULT_SIZE, DEFAULT_SIZE), Tile)
+        self.tilews = np.empty((DEFAULT_SIZE, DEFAULT_SIZE), TileWidget)
 
     def build(self) -> None:
         """
-        Build a square area with Tile objects
+        Build a square area with TileWidgets.
         """
         self.clear_map()
 
         width = self.width_box.value()
         height = self.height_box.value()
-        self.tiles = np.full((width, height), Tile)
+        self.tilews = np.empty((width, height), TileWidget)
 
+        counter = 0
         for x in range(width):
             for y in range(height):
-                tile = Tile()
-                self.map_grid.addWidget(tile, y, x)
-                self.tiles[x, y] = tile
+                tile = Tile(x=x, y=y)
+                tilew = TileWidget(tile)
+                self.map_grid.addWidget(tilew, y, x)
+                self.tilews[x, y] = tilew
+                counter += 1
 
     def clear_map(self) -> None:
         """
-        Clear the Tile widgets from the map grid
+        Clear the TileWidgets from the map grid.
         """
-        if not self.tiles.all():
+        # No clearing needed on the first run
+        if not self.tilews.all():
             return
-        for tile in self.tiles.flatten():
-            self.map_grid.removeWidget(tile)
+
+        for tilew in self.tilews.flatten():
+            self.map_grid.removeWidget(tilew)
 
     def get_tiles(self) -> np.ndarray:
-        return self.tiles
+        tiles = np.empty(np.size(self.tilews), Tile)
+        for i, tilew in enumerate(self.tilews.flatten()):
+            tiles[i] = tilew.tile
+        return tiles
 
     def build_button_clicked(self) -> None:
         self.build()
 
     def run_button_clicked(self) -> None:
-        print('clicked the run button')
+        print('\nValidating map ...')
+        try:
+            self.map_validator.validate_map(self.get_tiles())
+            print(f'Map validation successful!')
+        except ValidationError as e:
+            print(f'Map validation failed: {e.message}!')
