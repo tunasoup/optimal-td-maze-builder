@@ -1,4 +1,6 @@
-from typing import NamedTuple
+from typing import NamedTuple, Type
+
+from utils.tile_type import TType, TTypeBasic
 
 
 class Coords(NamedTuple):
@@ -7,16 +9,16 @@ class Coords(NamedTuple):
 
 
 class Tile:
-    def __init__(self, x, y, tile_type: str = 'basic'):
+    def __init__(self, x, y, ttype: Type[TType] = TTypeBasic):
         """
         A square tile which is a component of a map.
 
         Args:
             x: location on the x-axis
             y: location on the y-axis
-            tile_type: type of the tile
+            ttype: type of the tile
         """
         self.x = x
         self.y = y
         self.coords = Coords(self.x, self.y)
-        self.tile_type = tile_type
+        self.ttype = ttype

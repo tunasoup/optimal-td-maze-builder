@@ -1,15 +1,16 @@
 from queue import Queue
-from typing import Tuple, Dict, NamedTuple
+from typing import Tuple, Dict, NamedTuple, Type
 
 import numpy as np
 
 from utils.tile import Coords, Tile
+from utils.tile_type import TType
 
 NEIGHBOR_DELTAS = [(0, 1), (-1, 0), (1, 0), (0, -1)]
 
 
 class Node:
-    def __init__(self, coords: Coords, ttype: str):
+    def __init__(self, coords: Coords, ttype: Type[TType]):
         """
         A node used in a graph.
 
@@ -33,11 +34,11 @@ class Node:
         self._coords = coords
 
     @property
-    def ttype(self) -> str:
+    def ttype(self) -> Type[TType]:
         return self._ttype
 
     @ttype.setter
-    def ttype(self, ttype: str) -> None:
+    def ttype(self, ttype: Type[TType]) -> None:
         self._ttype = ttype
 
     @property
@@ -92,7 +93,7 @@ def tiles_to_nodes(tiles: np.ndarray) -> Dict[Coords, Node]:
     nodes = {}
     for tile in tiles:
         coords = tile.coords
-        node = Node(coords, tile.tile_type)
+        node = Node(coords, tile.ttype)
         nodes[coords] = node
 
     return nodes
@@ -147,7 +148,7 @@ def reset_node_fully(node: Node) -> None:
     node.neighbors = set()
 
 
-def depth_first_search_any_ttype(node, ending_ttype: str) -> Node:
+def depth_first_search_any_ttype(node, ending_ttype: Type[TType]) -> Node:
     """
     Using a recursive DFS, find any Node with the given tile type.
     Args:
@@ -170,7 +171,8 @@ def depth_first_search_any_ttype(node, ending_ttype: str) -> Node:
                 return ending_node
 
 
-def breadth_first_search(starting_node: Node, ending_type: str, node_count: int) -> Node:
+def breadth_first_search(starting_node: Node, ending_type: Type[TType],
+                         node_count: int) -> Node:
     """
     Unused BFS
 

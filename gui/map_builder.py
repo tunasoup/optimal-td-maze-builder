@@ -8,32 +8,11 @@ from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
 
 from utils.errors import ValidationError
 from utils.tile import Tile
+from utils.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE
 from utils.map_validation import MapValidator
 
 DEFAULT_SIZE = 6
 MINIMUM_SIZE = 2
-
-# todo: place these dicts somewhere else
-tile_colors: Dict[str, QColor] = {
-    'basic': QColor('#82add5'),
-    'unbuildable': QColor('#1f2d3a'),
-    'void': QColor('transparent'),
-    'spawn': QColor('#ff0000'),
-    'exit': QColor('green'),
-    'tower': QColor('#348bab'),
-    'route': QColor('#b5cfe8'),
-}
-
-tile_rotation: Dict[str, str] = {
-    'basic': 'unbuildable',
-    'unbuildable':  'void',
-    'void': 'spawn',
-    'spawn': 'exit',
-    'exit': 'tower',
-    'tower': 'basic',
-}
-
-tile_rotation_reverse = dict((v, k) for k, v in tile_rotation.items())
 
 
 class TileWidget(QWidget):
@@ -43,42 +22,42 @@ class TileWidget(QWidget):
         self.tile = tile
 
         self.setAutoFillBackground(True)
-        self.set_type_color(self.tile.tile_type)
+        self.set_type_color(self.tile.ttype)
 
     def rotate_type(self) -> None:
         """
         Change the type of the Tile to the next in rotation
         """
-        self.tile.tile_type = tile_rotation[self.tile.tile_type]
-        self.set_type_color(self.tile.tile_type)
+        self.tile.ttype = TILE_ROTATION[self.tile.ttype]
+        self.set_type_color(self.tile.ttype)
 
     def rotate_type_reverse(self) -> None:
         """
         Change the type of the Tile to the previous in rotation
         """
-        self.tile.tile_type = tile_rotation_reverse[self.tile.tile_type]
-        self.set_type_color(self.tile.tile_type)
+        self.tile.ttype = TILE_ROTATION_REVERSE[self.tile.ttype]
+        self.set_type_color(self.tile.ttype)
 
-    def change_to_type(self, tile_type: str) -> None:
+    def change_to_type(self, ttype: Type[TType]) -> None:
         """
         Change the type of the Tile to the given type
 
         Args:
-            tile_type: a string of the new tile type
+            ttype: a new tile type
 
         """
-        self.tile.tile_type = tile_type
-        self.set_type_color(tile_type)
+        self.tile.ttype = ttype
+        self.set_type_color(ttype)
 
-    def set_type_color(self, tile_type: str) -> None:
+    def set_type_color(self, ttype: Type[TType]) -> None:
         """
         Set the TileWidget's color to correspond with the given type
 
         Args:
-            tile_type: string of a tile type
+            ttype: a tile type whose defined color is to be used
         """
         palette = self.palette()
-        palette.setColor(QPalette.Window, tile_colors[tile_type])
+        palette.setColor(QPalette.Window, ttype.qcolor)
         self.setPalette(palette)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:

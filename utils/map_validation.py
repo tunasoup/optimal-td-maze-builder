@@ -7,6 +7,7 @@ from utils.errors import ValidationError
 from utils.graph_algorithms import depth_first_search_any_ttype, tiles_to_nodes, \
     connect_all_neighboring_nodes, reset_nodes
 from utils.tile import Tile
+from utils.tile_type import TTypeBasic, TTypeUnbuildable, TTypeSpawn, TTypeExit
 
 
 class MapValidator(ABC):
@@ -45,12 +46,12 @@ class MapValidator(ABC):
         ttypes = defaultdict(list)
 
         for tile in tiles:
-            ttypes[tile.tile_type].append(tile)
+            ttypes[tile.ttype.name].append(tile)
 
-        basics = np.array(ttypes['basic'])
-        unbuildables = np.array(ttypes['unbuildable'])
-        self.spawns = np.array(ttypes['spawn'])
-        self.exits = np.array(ttypes['exit'])
+        basics = np.array(ttypes[TTypeBasic.name])
+        unbuildables = np.array(ttypes[TTypeUnbuildable.name])
+        self.spawns = np.array(ttypes[TTypeSpawn.name])
+        self.exits = np.array(ttypes[TTypeExit.name])
         self.traversables = np.concatenate((basics, unbuildables, self.spawns,
                                            self.exits))
 
@@ -93,15 +94,17 @@ class MapValidator2D(MapValidator):
         found_exits = set()
         for coords in [tile.coords for tile in self.spawns]:
             reset_nodes(nodes)
-            exit_node = depth_first_search_any_ttype(nodes[coords], 'exit')
+            exit_node = depth_first_search_any_ttype(nodes[coords], TTypeExit)
             if not exit_node:
                 raise ValidationError('a spawn is blocked')
             found_exits.add(exit_node.coords)
 
+        # Only validate the exit tiles that were not already found
         exit_coords = [tile.coords for tile in self.exits]
         exit_coords = [coords for coords in exit_coords if coords not in found_exits]
+
         for coords in exit_coords:
             reset_nodes(nodes)
-            spawn_node = depth_first_search_any_ttype(nodes[coords], 'spawn')
+            spawn_node = depth_first_search_any_ttype(nodes[coords], TTypeSpawn)
             if not spawn_node:
                 raise ValidationError('an exit is blocked')
