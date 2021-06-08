@@ -1,14 +1,14 @@
-from typing import Dict, Type
+from typing import Type
 
 import numpy as np
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette, QColor, QMouseEvent
+from PyQt5.QtGui import QPalette, QMouseEvent
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox
 
 from utils.errors import ValidationError
-from utils.tile import Tile
-from utils.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE
+from tiles.tile import Tile
+from tiles.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE
 from utils.map_validation import MapValidator
 
 DEFAULT_SIZE = 6

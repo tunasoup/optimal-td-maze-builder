@@ -6,8 +6,7 @@ import numpy as np
 from utils.errors import ValidationError
 from utils.graph_algorithms import depth_first_search_any_ttype, tiles_to_nodes, \
     connect_all_neighboring_nodes, reset_nodes
-from utils.tile import Tile
-from utils.tile_type import TTypeBasic, TTypeUnbuildable, TTypeSpawn, TTypeExit
+from tiles.tile_type import TTypeBasic, TTypeUnbuildable, TTypeSpawn, TTypeExit
 
 
 class MapValidator(ABC):

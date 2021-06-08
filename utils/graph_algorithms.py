@@ -1,10 +1,10 @@
 from queue import Queue
-from typing import Tuple, Dict, NamedTuple, Type
+from typing import Dict, Type
 
 import numpy as np
 
-from utils.tile import Coords, Tile
-from utils.tile_type import TType
+from tiles.tile import Coords
+from tiles.tile_type import TType
 
 NEIGHBOR_DELTAS = [(0, 1), (-1, 0), (1, 0), (0, -1)]
 

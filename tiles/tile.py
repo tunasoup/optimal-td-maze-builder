@@ -1,6 +1,6 @@
 from typing import NamedTuple, Type
 
-from utils.tile_type import TType, TTypeBasic
+from tiles.tile_type import TType, TTypeBasic
 
 
 class Coords(NamedTuple):
