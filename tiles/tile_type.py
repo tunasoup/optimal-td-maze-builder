@@ -14,7 +14,7 @@ class TType(ABC):
 
 class TTypeBasic(TType):
     name = 'basic'
-    can_be_build_on = True
+    allow_building = True
     is_removable = False
     is_traversable = True
     qcolor = QColor('#82add5')
@@ -22,7 +22,7 @@ class TTypeBasic(TType):
 
 class TTypeUnbuildable(TType):
     name = 'unbuildable'
-    can_be_build_on = False
+    allow_building = False
     is_removable = False
     is_traversable = True
     qcolor = QColor('#1f2d3a')
@@ -30,7 +30,7 @@ class TTypeUnbuildable(TType):
 
 class TTypeVoid(TType):
     name = 'void'
-    can_be_build_on = False
+    allow_building = False
     is_removable = False
     is_traversable = False
     qcolor = QColor('transparent')
@@ -38,7 +38,7 @@ class TTypeVoid(TType):
 
 class TTypeSpawn(TType):
     name = 'spawn'
-    can_be_build_on = False
+    allow_building = False
     is_removable = False
     is_traversable = True
     qcolor = QColor('#ff0000')
@@ -46,7 +46,7 @@ class TTypeSpawn(TType):
 
 class TTypeExit(TType):
     name = 'exit'
-    can_be_build_on = False
+    allow_building = False
     is_removable = False
     is_traversable = True
     qcolor = QColor('green')
@@ -54,7 +54,7 @@ class TTypeExit(TType):
 
 class TTypeOccupied(TType):
     name = 'occupied'
-    can_be_build_on = False
+    allow_building = False
     is_removable = False  # todo: toggleable?
     is_traversable = False
     qcolor = QColor('#348bab')
@@ -62,7 +62,7 @@ class TTypeOccupied(TType):
 
 class TTypeRoute(TType):
     name = 'route'
-    can_be_build_on = True
+    allow_building = True
     is_removable = False
     is_traversable = True
     qcolor = QColor('#f7ed23')
