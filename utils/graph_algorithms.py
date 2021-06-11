@@ -1,5 +1,5 @@
 from queue import Queue
-from typing import Dict, Type
+from typing import Dict, Type, Set
 
 import numpy as np
 
@@ -23,7 +23,7 @@ class Node:
         self._visited = False
         self._distance = 0
         self._prequel = None
-        self.neighbors = set()
+        self.neighbors: Set["Node"] = set()
 
     @property
     def coords(self) -> Coords:
@@ -78,6 +78,11 @@ class Node:
 
     def remove_directed(self, node: "Node") -> None:
         self.neighbors.discard(node)
+
+    def remove_all_undirected(self) -> None:
+        for neighbor in self.neighbors:
+            neighbor.remove_directed(self)
+        self.neighbors = set()
 
 
 def tiles_to_nodes(tiles: np.ndarray) -> Dict[Coords, Node]:
@@ -171,10 +176,11 @@ def depth_first_search_any_ttype(node, ending_ttype: Type[TType]) -> Node:
                 return ending_node
 
 
-def breadth_first_search(starting_node: Node, ending_type: Type[TType],
-                         node_count: int) -> Node:
+def get_shortest_distance_any(starting_node: Node, ending_type: Type[TType],
+                              node_count: int) -> int:
     """
-    Unused BFS
+    Calculate and return the distance between a Node and any other Node
+    corresponding to the given type.
 
     Args:
         starting_node:
@@ -182,7 +188,7 @@ def breadth_first_search(starting_node: Node, ending_type: Type[TType],
         node_count:
 
     Returns:
-
+        the distance between the given node and any Node of the given type
     """
     starting_node.visited = True
     starting_node.distance = 0
@@ -193,9 +199,8 @@ def breadth_first_search(starting_node: Node, ending_type: Type[TType],
         for neighbor in node.neighbors:
             if not neighbor.visited:
                 if neighbor.ttype == ending_type:
-                    return neighbor
+                    return node.distance + 1
                 neighbor.visited = True
                 neighbor.distance = node.distance + 1
                 neighbor.parent = node
                 queue.put(neighbor)
-
