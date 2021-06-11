@@ -10,6 +10,7 @@ from utils.errors import ValidationError
 from tiles.tile import Tile
 from tiles.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE
 from utils.map_validation import MapValidator
+from utils.maze_building import NaiveBuilder
 
 DEFAULT_SIZE = 6
 MINIMUM_SIZE = 2
@@ -158,8 +159,19 @@ class Window(QMainWindow):
 
     def run_button_clicked(self) -> None:
         print('\nValidating map ...')
+        tiles = self.get_tiles()
         try:
-            self.map_validator.validate_map(self.get_tiles())
+            self.map_validator.validate_map(tiles)
             print(f'Map validation successful!')
         except ValidationError as e:
             print(f'Map validation failed: {e.message}!')
+
+        print('\nGenerating optimal maze ...')
+        builder = NaiveBuilder(tiles)
+        nodes = builder.generate_optimal_maze()
+        if nodes:
+            for coords, node in nodes.items():
+                self.tilews[coords[0], coords[1]].change_to_type(node.ttype)
+            print('\nMaze generated!')
+        else:
+            print('\nCannot create a maze!')
