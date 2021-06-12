@@ -9,6 +9,8 @@ class TType(ABC):
     allow_building = NotImplemented     # can place a tower
     is_removable = NotImplemented       # can be converted to a basic tile
     is_traversable = NotImplemented     # enemies can traverse the tile
+    is_spawn = NotImplemented
+    is_exit = NotImplemented
     qcolor = NotImplemented             # color of the tile on the GUI
 
 
@@ -17,6 +19,8 @@ class TTypeBasic(TType):
     allow_building = True
     is_removable = False
     is_traversable = True
+    is_spawn = False
+    is_exit = False
     qcolor = QColor('#82add5')
 
 
@@ -25,6 +29,8 @@ class TTypeUnbuildable(TType):
     allow_building = False
     is_removable = False
     is_traversable = True
+    is_spawn = False
+    is_exit = False
     qcolor = QColor('#1f2d3a')
 
 
@@ -33,6 +39,8 @@ class TTypeVoid(TType):
     allow_building = False
     is_removable = False
     is_traversable = False
+    is_spawn = False
+    is_exit = False
     qcolor = QColor('transparent')
 
 
@@ -41,6 +49,8 @@ class TTypeSpawn(TType):
     allow_building = False
     is_removable = False
     is_traversable = True
+    is_spawn = True
+    is_exit = False
     qcolor = QColor('#ff0000')
 
 
@@ -49,6 +59,8 @@ class TTypeExit(TType):
     allow_building = False
     is_removable = False
     is_traversable = True
+    is_spawn = False
+    is_exit = True
     qcolor = QColor('green')
 
 
@@ -57,6 +69,8 @@ class TTypeOccupied(TType):
     allow_building = False
     is_removable = False  # todo: toggleable?
     is_traversable = False
+    is_spawn = False
+    is_exit = False
     qcolor = QColor('#348bab')
 
 
@@ -65,6 +79,8 @@ class TTypeRoute(TType):
     allow_building = True
     is_removable = False
     is_traversable = True
+    is_spawn = False
+    is_exit = False
     qcolor = QColor('#f7ed23')
 
 
