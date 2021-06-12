@@ -21,11 +21,56 @@ class NaiveBuilder(MazeBuilder):
     def __init__(self, tiles: np.ndarray, max_towers: int = None):
         self.traversables = tiles_to_nodes(tiles[[tile.ttype.is_traversable for tile in tiles]])
         self.build_nodes = {k: v for k, v in self.traversables.items() if v.ttype.allow_building}
-        self.spawn_nodes = {k: v for k, v in self.traversables.items() if v.ttype == TTypeSpawn}
+        self.spawn_coords = [k for k, v in self.traversables.items() if v.ttype == TTypeSpawn]
+        self.exit_coords = [k for k, v in self.traversables.items() if v.ttype == TTypeExit]
         connect_all_neighboring_nodes(self.traversables)
+
+        self.removed = 0
+        self.clear_single_paths()
+        # todo: instead of maxmin distance, get all min distances and make
+        #  the decision in sorted order, rather than only the greatest
 
         self.max_towers = max_towers
         self.best_setup = None
+
+    def clear_single_paths(self) -> None:
+        """
+        Remove a traversable path from the list of build nodes, if it is the
+        only path that can be taken.
+        This reduces the number of combinations by ignoring
+        unsolvable mazes.
+        """
+        spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
+        exit_nodes = [self.traversables[k] for k in self.exit_coords]
+
+        for node in spawn_nodes + exit_nodes:
+            neighbors = node.neighbors
+            if len(neighbors) != 1:
+                continue
+
+            node = next(iter(neighbors))    # Get the only neighbor Node
+            if node.ttype.is_spawn or node.ttype.is_exit:
+                break
+            if node.ttype.allow_building:
+                del self.build_nodes[node.coords]
+                self.removed += 1
+            prev_node = node
+
+            while len(prev_node.neighbors) == 2:
+                neighbor = None
+                for neighbor in list(prev_node.neighbors):
+                    if neighbor == prev_node:
+                        continue
+                    if neighbor.ttype.is_spawn or neighbor.ttype.is_exit:
+                        break
+                    if neighbor.ttype.allow_building:
+                        del self.build_nodes[neighbor.coords]
+                        self.removed += 1
+                        break
+
+                prev_node = neighbor
+                if not neighbor:
+                    break
 
     def generate_optimal_maze(self) -> Dict[Coords, Node]:
         """
@@ -35,10 +80,12 @@ class NaiveBuilder(MazeBuilder):
             a dictionary with possibly modified traversable Nodes as values
         """
         # Find the maxmin distance to determine the possible amount of towers
-        maxmin_dist = get_maxmin_distance(list(self.spawn_nodes.values()),
+        spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
+        maxmin_dist = get_maxmin_distance(spawn_nodes,
                                           TTypeExit, len(self.traversables))
         reset_nodes(self.traversables)
-        possible_tower_count = len(self.build_nodes) - (maxmin_dist - 1)
+        build_count = len(self.build_nodes)
+        possible_tower_count = build_count - (maxmin_dist - 1 - self.removed)
         # todo: what if more than 1 exit
 
         # Set the largest amount of towers
@@ -78,8 +125,7 @@ class NaiveBuilder(MazeBuilder):
             current_nodes = deepcopy(self.traversables)
             current_build_nodes = {k: v for k, v in current_nodes.items() if
                                    v.ttype.allow_building}
-            current_spawn_nodes = {k: v for k, v in current_nodes.items() if
-                                   v.ttype == TTypeSpawn}
+            current_spawn_nodes = [current_nodes[k] for k in self.spawn_coords]
             dist = self.generate_maze(current_spawn_nodes, current_build_nodes, combination)
             if not best_dist or (dist and dist > best_dist):
                 best_dist = dist
@@ -87,7 +133,7 @@ class NaiveBuilder(MazeBuilder):
 
         return best_dist, best_setup
 
-    def generate_maze(self, spawn_nodes: Dict[Coords, Node],
+    def generate_maze(self, spawn_nodes: List[Node],
                       current_build_nodes: Dict[Coords, Node],
                       combination: Tuple[Coords, Coords, Coords]) -> int:
         """
@@ -107,7 +153,7 @@ class NaiveBuilder(MazeBuilder):
             node.ttype = TTypeOccupied
             node.remove_all_undirected()
 
-        dist = get_maxmin_distance(list(spawn_nodes.values()), TTypeExit,
+        dist = get_maxmin_distance(spawn_nodes, TTypeExit,
                                    len(self.traversables))
 
         return dist
