@@ -116,7 +116,7 @@ class Window(QMainWindow):
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
-        self.tilews = np.empty((DEFAULT_SIZE, DEFAULT_SIZE), TileWidget)
+        self.tile_widgets = np.empty((DEFAULT_SIZE, DEFAULT_SIZE), TileWidget)
 
     def build(self) -> None:
         """
@@ -126,7 +126,7 @@ class Window(QMainWindow):
 
         width = self.width_box.value()
         height = self.height_box.value()
-        self.tilews = np.empty((width, height), TileWidget)
+        self.tile_widgets = np.empty((width, height), TileWidget)
 
         counter = 0
         for x in range(width):
@@ -134,7 +134,7 @@ class Window(QMainWindow):
                 tile = Tile(x=x, y=y)
                 tilew = TileWidget(tile)
                 self.map_grid.addWidget(tilew, y, x)
-                self.tilews[x, y] = tilew
+                self.tile_widgets[x, y] = tilew
                 counter += 1
 
     def clear_map(self) -> None:
@@ -142,15 +142,15 @@ class Window(QMainWindow):
         Clear the TileWidgets from the map grid.
         """
         # No clearing needed on the first run
-        if not self.tilews.all():
+        if not self.tile_widgets.all():
             return
 
-        for tilew in self.tilews.flatten():
+        for tilew in self.tile_widgets.flatten():
             self.map_grid.removeWidget(tilew)
 
     def get_tiles(self) -> np.ndarray:
-        tiles = np.empty(np.size(self.tilews), Tile)
-        for i, tilew in enumerate(self.tilews.flatten()):
+        tiles = np.empty(np.size(self.tile_widgets), Tile)
+        for i, tilew in enumerate(self.tile_widgets.flatten()):
             tiles[i] = tilew.tile
         return tiles
 
@@ -165,13 +165,14 @@ class Window(QMainWindow):
             print(f'Map validation successful!')
         except ValidationError as e:
             print(f'Map validation failed: {e.message}!')
+            return
 
         print('\nGenerating optimal maze ...')
         builder = NaiveBuilder(tiles)
         nodes = builder.generate_optimal_maze()
         if nodes:
             for coords, node in nodes.items():
-                self.tilews[coords[0], coords[1]].change_to_type(node.ttype)
+                self.tile_widgets[coords.x, coords.y].change_to_type(node.ttype)
             print('\nMaze generated!')
         else:
             print('\nCannot create a maze!')
