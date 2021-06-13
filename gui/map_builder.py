@@ -4,7 +4,7 @@ import numpy as np
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QMouseEvent
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
-    QLabel, QPushButton, QSpinBox
+    QLabel, QPushButton, QSpinBox, QCheckBox
 
 from utils.errors import ValidationError
 from tiles.tile import Tile
@@ -89,8 +89,8 @@ class Window(QMainWindow):
 
         # Layout for the parameters
         info_widget = QWidget()
-        self.info_layout = QFormLayout()
-        self.info_layout.setSpacing(20)
+        info_layout = QFormLayout()
+        info_layout.setSpacing(20)
 
         # Spin boxes for determing the map area
         self.width_box = QSpinBox()
@@ -98,18 +98,29 @@ class Window(QMainWindow):
         for sb in [self.width_box, self.height_box]:
             sb.setMinimum(MINIMUM_SIZE)
             sb.setValue(DEFAULT_SIZE)
-        self.info_layout.addRow(QLabel('W:'), self.width_box)
-        self.info_layout.addRow(QLabel('H:'), self.height_box)
+        info_layout.addRow(QLabel('W:'), self.width_box)
+        info_layout.addRow(QLabel('H:'), self.height_box)
 
-        self.build_button = QPushButton('Build')
-        self.build_button.clicked.connect(self.build_button_clicked)
-        self.info_layout.addRow(self.build_button)
+        # Build button for initiating the map construction
+        build_button = QPushButton('Build')
+        build_button.clicked.connect(self.build_button_clicked)
+        info_layout.addRow(build_button)
 
+        # Optional limit for the number of towers
+        self.tower_limiter = QCheckBox()
+        self.tower_limiter.clicked.connect(self.tower_limiter_clicked)
+        self.max_towers_box = QSpinBox()
+        self.max_towers_box.setMinimum(0)
+        self.max_towers_box.setDisabled(True)
+        info_layout.addRow(QLabel('Limit towers:'), self.tower_limiter)
+        info_layout.addRow(QLabel('Tower count:'), self.max_towers_box)
+
+        # Run button for initiating the maze construction
         self.run_button = QPushButton('Run')
         self.run_button.clicked.connect(self.run_button_clicked)
-        self.info_layout.addRow(self.run_button)
+        info_layout.addRow(self.run_button)
 
-        info_widget.setLayout(self.info_layout)
+        info_widget.setLayout(info_layout)
         main_layout.addWidget(info_widget, 0, 3)
 
         central_widget = QWidget()
@@ -117,6 +128,9 @@ class Window(QMainWindow):
         self.setCentralWidget(central_widget)
 
         self.tile_widgets = np.empty((DEFAULT_SIZE, DEFAULT_SIZE), TileWidget)
+
+    def tower_limiter_clicked(self) -> None:
+        self.max_towers_box.setDisabled(not self.tower_limiter.isChecked())
 
     def build(self) -> None:
         """
@@ -168,7 +182,11 @@ class Window(QMainWindow):
             return
 
         print('\nGenerating optimal maze ...')
-        builder = NaiveBuilder(tiles)
+        max_towers = None
+        if self.tower_limiter.isChecked():
+            max_towers = self.max_towers_box.value()
+
+        builder = NaiveBuilder(tiles, max_towers)
         nodes = builder.generate_optimal_maze()
         if nodes:
             for coords, node in nodes.items():
