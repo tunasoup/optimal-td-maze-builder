@@ -1,5 +1,5 @@
 from queue import Queue
-from typing import Dict, Type, Set
+from typing import Dict, Type, Set, List
 
 import numpy as np
 
@@ -119,14 +119,14 @@ def connect_all_neighboring_nodes(nodes: Dict[Coords, Node]) -> None:
                 node.connect_directed(nodes[coords2])
 
 
-def reset_nodes(nodes: Dict[Coords, Node]) -> None:
+def reset_nodes(nodes: List[Node]) -> None:
     """
     Reset all given Nodes.
 
     Args:
-        nodes: a dictionary with the resetable Nodes as values
+        nodes: a list of resetable Nodes
     """
-    for node in nodes.values():
+    for node in nodes:
         reset_node(node)
 
 
@@ -140,6 +140,11 @@ def reset_node(node: Node) -> None:
     node.visited = False
     node.distance = 0
     node.prequel = 0
+
+
+def unvisit_nodes(nodes: List[Node]) -> None:
+    for node in nodes:
+        node.visited = False
 
 
 def reset_node_fully(node: Node) -> None:

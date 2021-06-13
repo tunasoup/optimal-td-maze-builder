@@ -2,14 +2,39 @@ from abc import ABC
 from copy import deepcopy
 from itertools import combinations
 from math import factorial
-from typing import Dict, List, Type, Tuple
+from typing import Dict, List, Type, Tuple, Union
 
 import numpy as np
 
 from tiles.tile import Tile, Coords
 from tiles.tile_type import TType, TTypeSpawn, TTypeExit, TTypeOccupied
 from utils.graph_algorithms import tiles_to_nodes, Node, \
-    get_shortest_distance_any, connect_all_neighboring_nodes, reset_nodes
+    get_shortest_distance_any, connect_all_neighboring_nodes, unvisit_nodes
+
+
+class Distances:
+    def __init__(self):
+        """
+        Holds a list of distances between Nodes. Two instances are compared
+        in an ascending order.
+        """
+        self.dists = []
+
+    def append(self, item: int) -> None:
+        self.dists.append(item)
+
+    def sort(self) -> None:
+        self.dists.sort()
+
+    def __gt__(self, other: "Distances") -> bool:
+        self.sort()
+        other.sort()
+        return self.dists > other.dists
+
+    def __ge__(self, other: "Distances") -> bool:
+        self.sort()
+        other.sort()
+        return self.dists >= other.dists
 
 
 class MazeBuilder(ABC):
@@ -27,8 +52,6 @@ class NaiveBuilder(MazeBuilder):
 
         self.removed = 0
         self.clear_single_paths()
-        # todo: instead of maxmin distance, get all min distances and make
-        #  the decision in sorted order, rather than only the greatest
 
         self.max_towers = max_towers
         self.best_setup = None
@@ -82,8 +105,7 @@ class NaiveBuilder(MazeBuilder):
         # Find the maxmin distance to determine the possible amount of towers
         spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
         maxmin_dist = get_maxmin_distance(spawn_nodes,
-                                          TTypeExit, len(self.traversables))
-        reset_nodes(self.traversables)
+                                          TTypeExit, list(self.traversables.values()))
         build_count = len(self.build_nodes)
         possible_tower_count = build_count - (maxmin_dist - 1 - self.removed)
         # todo: what if more than 1 exit
@@ -95,18 +117,18 @@ class NaiveBuilder(MazeBuilder):
             counter = possible_tower_count
 
         # Go through all the possible tower counts to obtain the longest maze
-        best_dist = None
+        best_dists = None
         while counter >= 0:
-            dist, best_setup = self.get_best_tower_combination(counter)
-            if not best_dist or (dist and dist >= best_dist):
-                best_dist = dist
+            dists, best_setup = self.get_best_tower_combination(counter)
+            if not best_dists or (dists and dists >= best_dists):
+                best_dists = dists
                 self.best_setup = deepcopy(best_setup)
             print(f'Tower count {counter} done')
             counter -= 1
 
         return self.best_setup
 
-    def get_best_tower_combination(self, tower_count: int) -> (int, Dict[Coords, Node]):
+    def get_best_tower_combination(self, tower_count: int) -> (Distances, Dict[Coords, Node]):
         """
         For every possible tower combination with the given tower amount,
         calculate the maxmin distance, and return the modified Nodes.
@@ -117,46 +139,43 @@ class NaiveBuilder(MazeBuilder):
         Returns:
             the maxmin distance of the modified map and its Nodes
         """
-        best_dist = None
+        best_dists = None
         best_setup = None
 
         combs = combinations(self.build_nodes, tower_count)
         for combination in combs:
             current_nodes = deepcopy(self.traversables)
-            current_build_nodes = {k: v for k, v in current_nodes.items() if
-                                   v.ttype.allow_building}
             current_spawn_nodes = [current_nodes[k] for k in self.spawn_coords]
-            dist = self.generate_maze(current_spawn_nodes, current_build_nodes, combination)
-            if not best_dist or (dist and dist > best_dist):
-                best_dist = dist
+            dists = self.generate_maze(current_spawn_nodes, current_nodes, combination)
+            if not best_dists or (dists and dists > best_dists):
+                best_dists = dists
                 best_setup = deepcopy(current_nodes)
 
-        return best_dist, best_setup
+        return best_dists, best_setup
 
     def generate_maze(self, spawn_nodes: List[Node],
-                      current_build_nodes: Dict[Coords, Node],
-                      combination: Tuple[Coords, Coords, Coords]) -> int:
+                      current_nodes: Dict[Coords, Node],
+                      combination: Tuple[Coords]) -> Distances:
         """
         Mark the given coordinates as towers/walls, and calculate the maxmin
         distance of the map.
 
         Args:
-            spawn_nodes:
-            current_build_nodes:
-            combination:
+            spawn_nodes: a list of spawn nodes
+            current_nodes: a dictionary of all the Nodes currently in the graph
+            combination: a tuple of Coords which mark the towers
 
         Returns:
-            the maxmin distance of the modified map
+            Distances object with the distances between spawns and their closest exit
         """
         for coords in combination:
-            node = current_build_nodes[coords]
+            node = current_nodes[coords]
             node.ttype = TTypeOccupied
             node.remove_all_undirected()
 
-        dist = get_maxmin_distance(spawn_nodes, TTypeExit,
-                                   len(self.traversables))
+        dists = get_distances(spawn_nodes, TTypeExit, list(current_nodes.values()))
 
-        return dist
+        return dists
 
 
 def number_of_combinations(subset: int, population: int) -> int:
@@ -174,22 +193,49 @@ def number_of_all_combinations(population: int) -> int:
     return combinations_count
 
 
-def get_maxmin_distance(l_spawn_nodes: List[Node], ending_type: Type[TType],
-                        node_count: int) -> int:
+def get_distances(spawn_nodes: List[Node], ending_type: Type[TType],
+                  current_nodes: List[Node]) -> Union[Distances, None]:
+    """
+    Calculate and return the distances between spawns and their closest exists.
+
+    Args:
+        spawn_nodes: a list of spawn Nodes
+        ending_type: a tile type to count the distance to
+        current_nodes:  a list of all the Nodes currently in the graph
+
+    Returns:
+
+    """
+    dists = Distances()
+    node_count = len(current_nodes)
+    for spawn_node in spawn_nodes:
+        unvisit_nodes(current_nodes)
+        dist = get_shortest_distance_any(spawn_node, ending_type,
+                                         node_count)
+        if not dist:
+            return None
+        dists.append(dist)
+    return dists
+
+
+def get_maxmin_distance(spawn_nodes: List[Node], ending_type: Type[TType],
+                        current_nodes: List[Node]) -> int:
     """
     Calculate and return the maxmin distance of a map. The value returned
     is the greatest shortest distance between different spawn nodes.
 
     Args:
-        l_spawn_nodes:
-        ending_type:
-        node_count:
+        spawn_nodes: a list of spawn Nodes
+        ending_type: a tile type to count the distance to
+        current_nodes: a list of all the Nodes currently in the graph
 
     Returns:
         the maxmin distance of a map
     """
     maxmin_distance = None
-    for spawn_node in l_spawn_nodes:
+    node_count = len(current_nodes)
+    for spawn_node in spawn_nodes:
+        unvisit_nodes(current_nodes)
         dist = get_shortest_distance_any(spawn_node, ending_type,
                                          node_count)
         if not maxmin_distance or (dist and dist > maxmin_distance):

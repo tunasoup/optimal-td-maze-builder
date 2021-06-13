@@ -92,7 +92,7 @@ class MapValidator2D(MapValidator):
 
         found_exits = set()
         for coords in [tile.coords for tile in self.spawns]:
-            reset_nodes(nodes)
+            reset_nodes(list(nodes.values()))
             exit_node = depth_first_search_any_ttype(nodes[coords], TTypeExit)
             if not exit_node:
                 raise ValidationError('a spawn is blocked')
@@ -103,7 +103,7 @@ class MapValidator2D(MapValidator):
         exit_coords = [coords for coords in exit_coords if coords not in found_exits]
 
         for coords in exit_coords:
-            reset_nodes(nodes)
+            reset_nodes(list(nodes.values()))
             spawn_node = depth_first_search_any_ttype(nodes[coords], TTypeSpawn)
             if not spawn_node:
                 raise ValidationError('an exit is blocked')
