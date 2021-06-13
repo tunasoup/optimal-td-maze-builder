@@ -1,7 +1,7 @@
 from abc import ABC
 from copy import deepcopy
 from itertools import combinations
-from math import factorial
+
 from typing import Dict, List, Type, Tuple, Union
 
 import numpy as np
@@ -38,16 +38,14 @@ class Distances:
 
 
 class MazeBuilder(ABC):
-    def generate_optimal_maze(self) -> Dict[Coords, Node]:
-        raise NotImplementedError
-
-
-class NaiveBuilder(MazeBuilder):
     def __init__(self, tiles: np.ndarray, max_towers: int = None):
         self.traversables = tiles_to_nodes(tiles[[tile.ttype.is_traversable for tile in tiles]])
-        self.build_nodes = {k: v for k, v in self.traversables.items() if v.ttype.allow_building}
-        self.spawn_coords = [k for k, v in self.traversables.items() if v.ttype == TTypeSpawn]
-        self.exit_coords = [k for k, v in self.traversables.items() if v.ttype == TTypeExit]
+        self.build_nodes = {k: v for k, v in self.traversables.items() if
+                            v.ttype.allow_building}
+        self.spawn_coords = [k for k, v in self.traversables.items() if
+                             v.ttype == TTypeSpawn]
+        self.exit_coords = [k for k, v in self.traversables.items() if
+                            v.ttype == TTypeExit]
         connect_all_neighboring_nodes(self.traversables)
 
         self.removed = 0
@@ -96,6 +94,14 @@ class NaiveBuilder(MazeBuilder):
                     break
 
     def generate_optimal_maze(self) -> Dict[Coords, Node]:
+        raise NotImplementedError
+
+
+class NaiveBuilder(MazeBuilder):
+    def __init__(self, tiles: np.ndarray, max_towers: int = None):
+        super().__init__(tiles, max_towers)
+
+    def generate_optimal_maze(self) -> Dict[Coords, Node]:
         """
         Generate a maze where the shortest route is as long as possible.
 
@@ -108,7 +114,7 @@ class NaiveBuilder(MazeBuilder):
                                           TTypeExit, list(self.traversables.values()))
         build_count = len(self.build_nodes)
         possible_tower_count = build_count - (maxmin_dist - 1 - self.removed)
-        # todo: what if more than 1 exit
+        # todo: what if more than 1 exit, what of when unbuildables
 
         # Set the largest amount of towers
         if self.max_towers and self.max_towers <= possible_tower_count:
@@ -146,19 +152,19 @@ class NaiveBuilder(MazeBuilder):
         for combination in combs:
             current_nodes = deepcopy(self.traversables)
             current_spawn_nodes = [current_nodes[k] for k in self.spawn_coords]
-            dists = self.generate_maze(current_spawn_nodes, current_nodes, combination)
+            dists = self.calculate_maze_distances(current_spawn_nodes, current_nodes, combination)
             if not best_dists or (dists and dists > best_dists):
                 best_dists = dists
                 best_setup = deepcopy(current_nodes)
 
         return best_dists, best_setup
 
-    def generate_maze(self, spawn_nodes: List[Node],
-                      current_nodes: Dict[Coords, Node],
-                      combination: Tuple[Coords]) -> Distances:
+    def calculate_maze_distances(self, spawn_nodes: List[Node],
+                                 current_nodes: Dict[Coords, Node],
+                                 combination: Tuple[Coords]) -> Distances:
         """
-        Mark the given coordinates as towers/walls, and calculate the maxmin
-        distance of the map.
+        Mark the given coordinates as towers/walls, and get the distance
+        between spawns and any exit Nodes.
 
         Args:
             spawn_nodes: a list of spawn nodes
@@ -176,21 +182,6 @@ class NaiveBuilder(MazeBuilder):
         dists = get_distances(spawn_nodes, TTypeExit, list(current_nodes.values()))
 
         return dists
-
-
-def number_of_combinations(subset: int, population: int) -> int:
-    c = factorial(population) / (factorial(subset)*factorial(population - subset))
-    return int(c)
-
-
-def number_of_all_combinations(population: int) -> int:
-    combinations_count = 0
-    subset = population
-    while subset >= 0:
-        combinations_count += number_of_combinations(subset, population)
-        subset -= 1
-
-    return combinations_count
 
 
 def get_distances(spawn_nodes: List[Node], ending_type: Type[TType],
