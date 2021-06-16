@@ -1,5 +1,5 @@
 from queue import Queue
-from typing import Dict, Type, Set, List
+from typing import Dict, Type, Set, List, Optional
 
 import numpy as np
 
@@ -83,6 +83,36 @@ class Node:
         for neighbor in self.neighbors:
             neighbor.remove_directed(self)
         self.neighbors = set()
+
+
+class Distances:
+    def __init__(self):
+        """
+        Holds a list of distances between Nodes. Two instances are compared
+        in an ascending order.
+        """
+        self.dists = []
+
+    def append(self, item: int) -> None:
+        self.dists.append(item)
+
+    def sort(self) -> None:
+        self.dists.sort()
+
+    def __gt__(self, other: "Distances") -> bool:
+        self.sort()
+        other.sort()
+        return self.dists > other.dists
+
+    def __ge__(self, other: "Distances") -> bool:
+        self.sort()
+        other.sort()
+        return self.dists >= other.dists
+
+    def __eq__(self, other: "Distances") -> bool:
+        self.sort()
+        other.sort()
+        return self.dists == other.dists
 
 
 def tiles_to_nodes(tiles: np.ndarray) -> Dict[Coords, Node]:
@@ -182,18 +212,19 @@ def depth_first_search_any_ttype(node, ending_ttype: Type[TType]) -> Node:
 
 
 def get_shortest_distance_any(starting_node: Node, ending_type: Type[TType],
-                              node_count: int) -> int:
+                              node_count: int) -> Optional[int]:
     """
     Calculate and return the distance between a Node and any other Node
     corresponding to the given type.
 
     Args:
-        starting_node:
-        ending_type:
-        node_count:
+        starting_node: a starting Node for the graph algorithm
+        ending_type: the tile type to be found
+        node_count: maximum number of Nodes in a Queue
 
     Returns:
-        the distance between the given node and any Node of the given type
+        the distance between the given node and any Node of the given type,
+        or None if a route is not available
     """
     starting_node.visited = True
     starting_node.distance = 0
@@ -209,3 +240,89 @@ def get_shortest_distance_any(starting_node: Node, ending_type: Type[TType],
                 neighbor.distance = node.distance + 1
                 neighbor.parent = node
                 queue.put(neighbor)
+
+
+def get_closest_any(starting_node: Node, ending_type: Type[TType],
+                    node_count: int) -> Optional[Node]:
+    """
+    Find a Node of the given type that is closest to the starting Node.
+
+    Args:
+        starting_node: a starting Node for the graph algorithm
+        ending_type: the tile type to be found
+        node_count: maximum number of Nodes in a Queue
+
+    Returns:
+        the closest Node corresponding to the given tile type from the starting
+        Node, or None if no route is available
+    """
+    starting_node.visited = True
+    starting_node.distance = 0
+    queue = Queue(maxsize=node_count-1)
+    queue.put(starting_node)
+    while not queue.empty():
+        node = queue.get()
+        for neighbor in node.neighbors:
+            if not neighbor.visited:
+                neighbor.visited = True
+                neighbor.distance = node.distance + 1
+                neighbor.parent = node
+
+                if neighbor.ttype == ending_type:
+                    return neighbor
+                queue.put(neighbor)
+
+
+def get_distances(starting_nodes: List[Node], ending_type: Type[TType],
+                  current_nodes: List[Node]) -> Optional[Distances]:
+    """
+    Calculate and return the distances between starting Nodes and their
+    closest Nodes with the corresponding tile type.
+
+    Args:
+        starting_nodes: a list of starting Nodes
+        ending_type: a tile type to count the distances to
+        current_nodes: a list of Nodes currently in the graph which are
+                       needed for resetting
+
+    Returns:
+        a Distances object with distances of each starting Node, or None
+        if even a single route is unavailable
+    """
+    dists = Distances()
+    node_count = len(current_nodes)
+    for start_node in starting_nodes:
+        unvisit_nodes(current_nodes)
+        dist = get_shortest_distance_any(start_node, ending_type,
+                                         node_count)
+        if not dist:
+            return None
+        dists.append(dist)
+    return dists
+
+
+def get_maxmin_distance(starting_nodes: List[Node], ending_type: Type[TType],
+                        current_nodes: List[Node]) -> Optional[int]:
+    """
+    Calculate and return the maxmin distance of a map. The value returned
+    is the greatest shortest distance between different spawn nodes.
+
+    Args:
+        starting_nodes: a list of starting Nodes
+        ending_type: a tile type to count the distance to
+        current_nodes: a list of Nodes currently in the graph which are
+                       needed for resetting
+    Returns:
+        the maxmin distance between the starting Nodes and Nodes corresponding
+        to the given tile type, or None if no route is available
+    """
+    maxmin_distance = None
+    node_count = len(current_nodes)
+    for start_node in starting_nodes:
+        unvisit_nodes(current_nodes)
+        dist = get_shortest_distance_any(start_node, ending_type,
+                                         node_count)
+        if not maxmin_distance or (dist and dist > maxmin_distance):
+            maxmin_distance = dist
+
+    return maxmin_distance
