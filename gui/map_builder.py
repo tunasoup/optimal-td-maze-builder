@@ -1,3 +1,4 @@
+import threading
 from typing import Type
 
 import numpy as np
@@ -10,7 +11,7 @@ from utils.errors import ValidationError
 from tiles.tile import Tile
 from tiles.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE
 from utils.map_validation import MapValidator
-from utils.maze_building import NaiveBuilder
+from builders import NaiveBuilder
 
 DEFAULT_SIZE = 6
 MINIMUM_SIZE = 2
@@ -116,9 +117,9 @@ class Window(QMainWindow):
         info_layout.addRow(QLabel('Tower count:'), self.max_towers_box)
 
         # Run button for initiating the maze construction
-        self.run_button = QPushButton('Run')
-        self.run_button.clicked.connect(self.run_button_clicked)
-        info_layout.addRow(self.run_button)
+        run_button = QPushButton('Run')
+        run_button.clicked.connect(self.run_button_clicked)
+        info_layout.addRow(run_button)
 
         info_widget.setLayout(info_layout)
         main_layout.addWidget(info_widget, 0, 3)
@@ -126,6 +127,8 @@ class Window(QMainWindow):
         central_widget = QWidget()
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
+
+        self.buttons = [build_button, run_button]
 
         self.tile_widgets = np.empty((DEFAULT_SIZE, DEFAULT_SIZE), TileWidget)
 
@@ -172,6 +175,25 @@ class Window(QMainWindow):
         self.build()
 
     def run_button_clicked(self) -> None:
+        self.disable_buttons(True)
+        t1 = threading.Thread(target=self.initiate_maze_creating)
+        t1.daemon = True
+        t1.start()
+
+    def disable_buttons(self, set_disable: bool) -> None:
+        """
+        Disable or enable all the buttons on the GUI.
+
+        Args:
+            set_disable: True to disable buttons, False to enable
+        """
+        for button in self.buttons:
+            button.setDisabled(set_disable)
+
+    def initiate_maze_creating(self):
+        """
+        Start the validation and maze creation for the current map.
+        """
         print('\nValidating map ...')
         tiles = self.get_tiles()
         try:
@@ -179,6 +201,7 @@ class Window(QMainWindow):
             print(f'Map validation successful!')
         except ValidationError as e:
             print(f'Map validation failed: {e.message}!')
+            self.disable_buttons(False)
             return
 
         print('\nGenerating optimal maze ...')
@@ -190,7 +213,10 @@ class Window(QMainWindow):
         nodes = builder.generate_optimal_maze()
         if nodes:
             for coords, node in nodes.items():
-                self.tile_widgets[coords.x, coords.y].change_to_type(node.ttype)
+                self.tile_widgets[coords.x, coords.y].change_to_type(
+                    node.ttype)
             print('\nMaze generated!')
         else:
             print('\nCannot create a maze!')
+
+        self.disable_buttons(False)
