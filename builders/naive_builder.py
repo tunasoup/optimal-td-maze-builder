@@ -22,12 +22,12 @@ class NaiveBuilder(MazeBuilder):
         """
         super().__init__(tiles, max_towers)
 
-    def generate_optimal_maze(self) -> Optional[Dict[Coords, Node]]:
+    def generate_optimal_mazes(self) -> List[Dict[Coords, Node]]:
         """
         Generate a maze where the shortest route is as long as possible.
 
         Returns:
-            a dictionary with possibly modified traversable Nodes as values
+            a list of dictionaries with possibly modified traversable Nodes as values
         """
         # Find the maxmin distance to determine the possible amount of towers
         spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
@@ -46,39 +46,50 @@ class NaiveBuilder(MazeBuilder):
         # Go through all the possible tower counts to obtain the longest maze
         best_dists = None
         while counter >= 0:
-            dists, best_setup = self.get_best_tower_combination(counter)
-            if not best_dists or (dists and dists >= best_dists):
+            print(f'Testing combinations with {counter} towers')
+            dists, best_setups = self.get_best_tower_combinations(counter)
+            if not dists:
+                continue
+
+            if not best_dists or dists > best_dists:
                 best_dists = dists
-                self.best_setup = deepcopy(best_setup)
-            print(f'Tower count {counter} done')
+                self.best_setups = best_setups
+            elif dists == best_dists:
+                self.best_setups += best_setups
+
             counter -= 1
 
-        return self.best_setup
+        return self.best_setups
 
-    def get_best_tower_combination(self, tower_count: int) -> (Optional[Distances], Optional[Coords]):
+    def get_best_tower_combinations(self, tower_count: int) -> (Optional[Distances], List[Dict[Coords, Node]]):
         """
         For every possible tower combination with the given tower amount,
-        calculate the maxmin distance, and return the modified Nodes.
+        calculate the spawn-exit Distances, and return the modified Nodes.
 
         Args:
             tower_count: number of towers/walls in the maze
 
         Returns:
-            the maxmin distance of the modified map and its Nodes
+            longest Distances of the modified map and their Nodes
         """
         best_dists = None
-        best_setup = None
+        best_setups = []
 
         combs = combinations(self.build_nodes, tower_count)
         for combination in combs:
             current_nodes = deepcopy(self.traversables)
             current_spawn_nodes = [current_nodes[k] for k in self.spawn_coords]
             dists = self.calculate_maze_distances(current_spawn_nodes, current_nodes, combination)
-            if not best_dists or (dists and dists > best_dists):
-                best_dists = dists
-                best_setup = deepcopy(current_nodes)
+            if not dists:
+                continue
 
-        return best_dists, best_setup
+            if not best_dists or dists > best_dists:
+                best_dists = dists
+                best_setups = [deepcopy(current_nodes)]
+            elif dists == best_dists:
+                best_setups.append(deepcopy(current_nodes))
+
+        return best_dists, best_setups
 
     def calculate_maze_distances(self, spawn_nodes: List[Node],
                                  current_nodes: Dict[Coords, Node],

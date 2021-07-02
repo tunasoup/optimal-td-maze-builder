@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 
@@ -32,7 +32,7 @@ class MazeBuilder(ABC):
         self.clear_single_paths()
 
         self.max_towers = max_towers
-        self.best_setup = None
+        self.best_setups = []
 
     def clear_single_paths(self) -> None:
         """
@@ -73,5 +73,5 @@ class MazeBuilder(ABC):
                 if not neighbor:
                     break
 
-    def generate_optimal_maze(self) -> Dict[Coords, Node]:
+    def generate_optimal_mazes(self) -> List[Dict[Coords, Node]]:
         raise NotImplementedError

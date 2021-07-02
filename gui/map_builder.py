@@ -121,6 +121,14 @@ class Window(QMainWindow):
         run_button.clicked.connect(self.run_button_clicked)
         info_layout.addRow(run_button)
 
+        # Spin box for selecting different variations of the best maze
+        self.variation_box = QSpinBox()
+        self.variation_box.setMinimum(1)
+        self.variation_box.setDisabled(True)
+        self.variation_box.valueChanged.connect(self.variation_changed)
+        self.variation_label = QLabel('Variations (1)')
+        info_layout.addRow(self.variation_label, self.variation_box)
+
         info_widget.setLayout(info_layout)
         main_layout.addWidget(info_widget, 0, 3)
 
@@ -131,15 +139,22 @@ class Window(QMainWindow):
         self.buttons = [build_button, run_button]
 
         self.tile_widgets = np.empty((DEFAULT_SIZE, DEFAULT_SIZE), TileWidget)
+        self.best_setups = []
 
     def tower_limiter_clicked(self) -> None:
         self.max_towers_box.setDisabled(not self.tower_limiter.isChecked())
+
+    def variation_changed(self) -> None:
+        index = self.variation_box.value() - 1
+        self.show_variation(index)
 
     def build(self) -> None:
         """
         Build a square area with TileWidgets.
         """
         self.clear_map()
+        self.best_setups = []
+        self.variation_box.setDisabled(True)
 
         width = self.width_box.value()
         height = self.height_box.value()
@@ -210,13 +225,34 @@ class Window(QMainWindow):
             max_towers = self.max_towers_box.value()
 
         builder = NaiveBuilder(tiles, max_towers)
-        nodes = builder.generate_optimal_maze()
-        if nodes:
-            for coords, node in nodes.items():
-                self.tile_widgets[coords.x, coords.y].change_to_type(
-                    node.ttype)
-            print('\nMaze generated!')
+        self.best_setups = builder.generate_optimal_mazes()
+        if self.best_setups:
+            maze_count = len(self.best_setups)
+            self.variation_label.setText(f'Variations ({maze_count})')
+            self.variation_box.setMaximum(maze_count)
+
+            # Show the final variation which has least towers
+            if self.variation_box.value() == maze_count:
+                self.show_variation(maze_count - 1)
+            self.variation_box.setValue(maze_count)
+            self.variation_box.setDisabled(False)
+
         else:
             print('\nCannot create a maze!')
 
         self.disable_buttons(False)
+
+    def show_variation(self, index: int) -> None:
+        """
+        Change the tile types in the GUI according to a specific maze setup.
+
+        Args:
+            index: index of the best maze setup
+        """
+        if index >= len(self.best_setups) or index < 0:
+            print('Variation does not exist!')
+            return
+
+        for coords, node in self.best_setups[index].items():
+            self.tile_widgets[coords.x, coords.y].change_to_type(node.ttype)
+        # print('\nMaze generated!')
