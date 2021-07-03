@@ -5,7 +5,8 @@ import numpy as np
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QMouseEvent
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
-    QLabel, QPushButton, QSpinBox, QCheckBox
+    QLabel, QPushButton, QSpinBox, QCheckBox, QMenu, QAction, QMenuBar, \
+    QActionGroup
 
 from utils.errors import ValidationError
 from tiles.tile import Tile
@@ -79,6 +80,8 @@ class Window(QMainWindow):
         self.setGeometry(300, 300, 600, 400)
         self.setWindowTitle("TD maze builder")
 
+        self.create_menubar()
+
         main_layout = QGridLayout()
 
         # Layout for the map
@@ -140,6 +143,72 @@ class Window(QMainWindow):
 
         self.tile_widgets = np.empty((DEFAULT_SIZE, DEFAULT_SIZE), TileWidget)
         self.best_setups = []
+
+    def create_menubar(self) -> None:
+        menubar = self.menuBar()
+        self.add_maze_menu(menubar)
+        self.add_options_menu(menubar)
+        self.add_help_menu(menubar)
+
+    def add_maze_menu(self, menubar: QMenuBar) -> None:
+        maze_menu = QMenu('Maze', self)
+        menubar.addMenu(maze_menu)
+
+        import_action = QAction('Import...', self)
+        import_action.triggered.connect(self.import_maze)
+        maze_menu.addAction(import_action)
+
+        export_action = QAction('Export...', self)
+        export_action.triggered.connect(self.export_maze)
+        maze_menu.addAction(export_action)
+
+    def import_maze(self):
+        # Todo
+        print('clicked import')
+
+    def export_maze(self):
+        # Todo
+        print('clicked export')
+
+    def add_options_menu(self, menubar: QMenuBar) -> None:
+        options_menu = QMenu('Options', self)
+        menubar.addMenu(options_menu)
+
+        # Select the number of neighbors
+        neighbors_menu = options_menu.addMenu('Neigbors')
+        neighbor_group = QActionGroup(self)
+        neighbors_four_action = QAction('4', self)
+        neighbors_eight_action = QAction('8', self)
+        neighbor_group.addAction(neighbors_four_action)
+        neighbor_group.addAction(neighbors_eight_action)
+        neighbors_four_action.setCheckable(True)
+        neighbors_eight_action.setCheckable(True)
+        neighbors_four_action.setChecked(True)
+        neighbors_menu.addAction(neighbors_four_action)
+        neighbors_menu.addAction(neighbors_eight_action)
+        # todo slot neighbor_group.triggered
+
+    def add_help_menu(self, menubar: QMenuBar) -> None:
+        help_menu = QMenu('Help', self)
+        menubar.addMenu(help_menu)
+
+        help_action = QAction('Help...', self)
+        help_action.triggered.connect(self.show_help)
+        help_menu.addAction(help_action)
+
+        help_menu.addSeparator()
+
+        about_action = QAction('About...', self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+
+    def show_help(self):
+        # Todo
+        print('clicked help')
+
+    def show_about(self):
+        # Todo
+        print('clicked about')
 
     def tower_limiter_clicked(self) -> None:
         self.max_towers_box.setDisabled(not self.tower_limiter.isChecked())
