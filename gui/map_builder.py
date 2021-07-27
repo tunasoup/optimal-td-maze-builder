@@ -6,7 +6,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QMouseEvent
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox, QCheckBox, QMenu, QAction, QMenuBar, \
-    QActionGroup
+    QActionGroup, QFileDialog
 
 from utils.errors import ValidationError
 from tiles.tile import Tile
@@ -162,13 +162,34 @@ class Window(QMainWindow):
         export_action.triggered.connect(self.export_maze)
         maze_menu.addAction(export_action)
 
-    def import_maze(self):
-        # Todo
-        print('clicked import')
+    def import_maze(self) -> None:
+        """
+        Import a saved maze.
+        """
+        file_path, _ = QFileDialog.getOpenFileName(self,
+                                                   "Open File",
+                                                   "maps",
+                                                   "npz (*.npz)")
+        if file_path:
+            np_file = np.load(file_path, allow_pickle=True)
+            tiles = np_file[np_file.files[0]]
+            self.build_from_tiles(tiles)
 
-    def export_maze(self):
-        # Todo
-        print('clicked export')
+    def export_maze(self) -> None:
+        """
+        Save the current maze as a file.
+
+        Note that only the visual part of the current maze is saved,
+        and the maze acts as if it has not been validated yet.
+        """
+        tiles = self.get_tiles()
+        file_path, _ = QFileDialog.getSaveFileName(self,
+                                                   "Save File",
+                                                   "maps",
+                                                   "npz (*.npz)")
+        if file_path:
+            print(file_path)
+            np.savez_compressed(file_path, tiles)
 
     def add_options_menu(self, menubar: QMenuBar) -> None:
         options_menu = QMenu('Options', self)
@@ -219,24 +240,42 @@ class Window(QMainWindow):
 
     def build(self) -> None:
         """
-        Build a square area with TileWidgets.
+        Build a rectangle area of TileWidgets.
         """
         self.clear_map()
-        self.best_setups = []
         self.variation_box.setDisabled(True)
 
         width = self.width_box.value()
         height = self.height_box.value()
         self.tile_widgets = np.empty((width, height), TileWidget)
 
-        counter = 0
         for x in range(width):
             for y in range(height):
                 tile = Tile(x=x, y=y)
                 tilew = TileWidget(tile)
                 self.map_grid.addWidget(tilew, y, x)
                 self.tile_widgets[x, y] = tilew
-                counter += 1
+
+    def build_from_tiles(self, tiles) -> None:
+        """
+        Build a rectangle area of TileWidgets with given tiles.
+        """
+        self.clear_map()
+        self.variation_box.setDisabled(True)
+
+        # The ultimate tile is assumed to be in the bottom-right corner
+        ultimate_tile = tiles[-1]
+        width, height = ultimate_tile.x + 1, ultimate_tile.y + 1
+
+        self.width_box.setValue(width)
+        self.height_box.setValue(height)
+        self.tile_widgets = np.empty((width, height), TileWidget)
+
+        for tile in tiles:
+            tilew = TileWidget(tile)
+            x, y = tile.x, tile.y
+            self.map_grid.addWidget(tilew, y, x)
+            self.tile_widgets[x, y] = tilew
 
     def clear_map(self) -> None:
         """
@@ -248,6 +287,8 @@ class Window(QMainWindow):
 
         for tilew in self.tile_widgets.flatten():
             self.map_grid.removeWidget(tilew)
+
+        self.best_setups = []
 
     def get_tiles(self) -> np.ndarray:
         tiles = np.empty(np.size(self.tile_widgets), Tile)
