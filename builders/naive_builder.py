@@ -12,7 +12,7 @@ from utils.graph_algorithms import Node, get_maxmin_distance, Distances, \
 
 
 class NaiveBuilder(MazeBuilder):
-    def __init__(self, tiles: np.ndarray, max_towers: int = None):
+    def __init__(self, tiles: np.ndarray, neighbor_count: int, max_towers: int = None):
         """
         Finds the optimal maze by testing every single maze combination.
 
@@ -20,7 +20,7 @@ class NaiveBuilder(MazeBuilder):
             tiles: an array of Tiles
             max_towers: maximum number of towers allowed in the maze
         """
-        super().__init__(tiles, max_towers)
+        super().__init__(tiles, neighbor_count, max_towers)
 
     def generate_optimal_mazes(self) -> List[Dict[Coords, Node]]:
         """

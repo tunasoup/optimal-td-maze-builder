@@ -6,7 +6,10 @@ import numpy as np
 from tiles.tile import Coords
 from tiles.tile_type import TType
 
-NEIGHBOR_DELTAS = [(0, 1), (-1, 0), (1, 0), (0, -1)]
+NEIGHBOR_DELTAS = {
+    4: [(0, 1), (-1, 0), (1, 0), (0, -1)],
+    8: [(-1, 1), (0, 1), (1, 1), (-1, 0), (1, 0), (-1, -1), (0, -1), (1, -1)]
+}
 
 
 class Node:
@@ -134,17 +137,19 @@ def tiles_to_nodes(tiles: np.ndarray) -> Dict[Coords, Node]:
     return nodes
 
 
-def connect_all_neighboring_nodes(nodes: Dict[Coords, Node]) -> None:
+def connect_all_neighboring_nodes(nodes: Dict[Coords, Node], neighbor_count: int) -> None:
     """
     Connect all the given Nodes together, so that a single Node is
-    connected to its 4 possible neighbors.
+    connected to its 4 or 8 possible neighbors.
 
     Args:
         nodes: a dictionary with the connectable Nodes as values
+        neighbor_count: the number of neighbors a Node can have
     """
+    deltas = NEIGHBOR_DELTAS[neighbor_count]
     for coords, node in nodes.items():
 
-        for coords2 in [Coords(*tuple(map(sum, zip(coords, delta)))) for delta in NEIGHBOR_DELTAS]:
+        for coords2 in [Coords(*tuple(map(sum, zip(coords, delta)))) for delta in deltas]:
             if coords2 in nodes.keys():
                 node.connect_directed(nodes[coords2])
 

@@ -10,13 +10,14 @@ from utils.graph_algorithms import tiles_to_nodes, \
 
 
 class MazeBuilder(ABC):
-    def __init__(self, tiles: np.ndarray, max_towers: int = None):
+    def __init__(self, tiles: np.ndarray, neighbor_count: int, max_towers: int = None):
         """
         An abstract maze builder class. The maze builders try to build the
         optimal maze (long routes, minimal resources) for a given map.
 
         Args:
             tiles: an array of Tiles
+            neighbor_count: the number of neighbors a Node can have
             max_towers: maximum number of towers allowed in the maze
         """
         self.traversables = tiles_to_nodes(tiles[[tile.ttype.is_traversable for tile in tiles]])
@@ -26,7 +27,7 @@ class MazeBuilder(ABC):
                              v.ttype == TTypeSpawn]
         self.exit_coords = [k for k, v in self.traversables.items() if
                             v.ttype == TTypeExit]
-        connect_all_neighboring_nodes(self.traversables)
+        connect_all_neighboring_nodes(self.traversables, neighbor_count)
 
         self.removed = 0
         self.clear_single_paths()

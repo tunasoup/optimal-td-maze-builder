@@ -197,17 +197,15 @@ class Window(QMainWindow):
 
         # Select the number of neighbors
         neighbors_menu = options_menu.addMenu('Neigbors')
-        neighbor_group = QActionGroup(self)
-        neighbors_four_action = QAction('4', self)
-        neighbors_eight_action = QAction('8', self)
-        neighbor_group.addAction(neighbors_four_action)
-        neighbor_group.addAction(neighbors_eight_action)
-        neighbors_four_action.setCheckable(True)
-        neighbors_eight_action.setCheckable(True)
-        neighbors_four_action.setChecked(True)
-        neighbors_menu.addAction(neighbors_four_action)
-        neighbors_menu.addAction(neighbors_eight_action)
-        # todo slot neighbor_group.triggered
+        self.neighbor_group = QActionGroup(self)
+
+        for count in [4, 8]:
+            neighbor_action = QAction(str(count), self)
+            self.neighbor_group.addAction(neighbor_action)
+            neighbor_action.setCheckable(True)
+            neighbors_menu.addAction(neighbor_action)
+
+        self.neighbor_group.actions()[0].setChecked(True)
 
     def add_help_menu(self, menubar: QMenuBar) -> None:
         help_menu = QMenu('Help', self)
@@ -320,9 +318,10 @@ class Window(QMainWindow):
         Start the validation and maze creation for the current map.
         """
         print('\nValidating map ...')
+        neighbor_count = int(self.neighbor_group.checkedAction().text())
         tiles = self.get_tiles()
         try:
-            self.map_validator.validate_map(tiles)
+            self.map_validator.validate_map(tiles, neighbor_count)
             print(f'Map validation successful!')
         except ValidationError as e:
             print(f'Map validation failed: {e.message}!')
@@ -334,7 +333,7 @@ class Window(QMainWindow):
         if self.tower_limiter.isChecked():
             max_towers = self.max_towers_box.value()
 
-        builder = NaiveBuilder(tiles, max_towers)
+        builder = NaiveBuilder(tiles, neighbor_count, max_towers)
         self.best_setups = builder.generate_optimal_mazes()
         if self.best_setups:
             maze_count = len(self.best_setups)

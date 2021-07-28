@@ -21,19 +21,20 @@ class MapValidator(ABC):
         self.spawns = None
         self.exits = None
 
-    def validate_map(self, tiles: np.ndarray):
+    def validate_map(self, tiles: np.ndarray, neighbor_count: int):
         """
         Initiate the validation of a built map, whose subfunctions raise an
         error if the map is flawed.
 
         Args:
             tiles: an array of Tiles
+            neighbor_count: the number of neighbors a Node can have
         """
         self.divide_types(tiles)
 
         self.validate_spawns()
         self.validate_exits()
-        self.validate_route()
+        self.validate_route(neighbor_count)
 
     def divide_types(self, tiles: np.ndarray) -> None:
         """
@@ -69,10 +70,13 @@ class MapValidator(ABC):
             raise ValidationError('not enough exits')
 
     @abstractmethod
-    def validate_route(self) -> None:
+    def validate_route(self, neighbor_count: int) -> None:
         """
         Check that there is a route for the enemies, so that they can
         reach the exit(s).
+
+        Args:
+            neighbor_count: the number of neighbors a Node can have
         """
         raise NotImplementedError()
 
@@ -82,13 +86,16 @@ class MapValidator2D(MapValidator):
     Validates a 2D map where a spawn or an exit cannot be blocked.
     """
 
-    def validate_route(self):
+    def validate_route(self, neighbor_count: int):
         """
         Raise an error if any spawn or exit is not connected to at least one
         counterpart.
+
+        Args:
+            neighbor_count: the number of neighbors a Node can have
         """
         nodes = tiles_to_nodes(self.traversables)
-        connect_all_neighboring_nodes(nodes)
+        connect_all_neighboring_nodes(nodes, neighbor_count)
 
         found_exits = set()
         for coords in [tile.coords for tile in self.spawns]:
