@@ -11,7 +11,7 @@ class TType(ABC):
     is_traversable = NotImplemented     # enemies can traverse the tile
     is_spawn = NotImplemented
     is_exit = NotImplemented
-    qcolor = NotImplemented             # color of the tile on the GUI
+    color = NotImplemented              # color of the tile on the GUI
 
 
 class TTypeBasic(TType):
@@ -21,7 +21,6 @@ class TTypeBasic(TType):
     is_traversable = True
     is_spawn = False
     is_exit = False
-    qcolor = QColor('#82add5')
 
 
 class TTypeUnbuildable(TType):
@@ -31,7 +30,6 @@ class TTypeUnbuildable(TType):
     is_traversable = True
     is_spawn = False
     is_exit = False
-    qcolor = QColor('#1f2d3a')
 
 
 class TTypeVoid(TType):
@@ -41,7 +39,6 @@ class TTypeVoid(TType):
     is_traversable = False
     is_spawn = False
     is_exit = False
-    qcolor = QColor('transparent')
 
 
 class TTypeSpawn(TType):
@@ -51,7 +48,6 @@ class TTypeSpawn(TType):
     is_traversable = True
     is_spawn = True
     is_exit = False
-    qcolor = QColor('#ff0000')
 
 
 class TTypeExit(TType):
@@ -61,7 +57,6 @@ class TTypeExit(TType):
     is_traversable = True
     is_spawn = False
     is_exit = True
-    qcolor = QColor('green')
 
 
 class TTypeOccupied(TType):
@@ -71,7 +66,6 @@ class TTypeOccupied(TType):
     is_traversable = False
     is_spawn = False
     is_exit = False
-    qcolor = QColor('#348bab')
 
 
 class TTypeRoute(TType):
@@ -81,8 +75,17 @@ class TTypeRoute(TType):
     is_traversable = True
     is_spawn = False
     is_exit = False
-    qcolor = QColor('#f7ed23')
 
+
+TTYPES = {
+    'basic': TTypeBasic,
+    'unbuildable': TTypeUnbuildable,
+    'void': TTypeVoid,
+    'spawn': TTypeSpawn,
+    'exit': TTypeExit,
+    'occupied': TTypeOccupied,
+    'route': TTypeRoute,
+}
 
 TILE_ROTATION: Dict[Type[TType], Type[TType]] = {
     TTypeBasic:         TTypeUnbuildable,

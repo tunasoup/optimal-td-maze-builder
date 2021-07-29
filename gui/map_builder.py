@@ -3,11 +3,12 @@ from typing import Type
 
 import numpy as np
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette, QMouseEvent
+from PyQt5.QtGui import QPalette, QMouseEvent, QColor
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox, QCheckBox, QMenu, QAction, QMenuBar, \
     QActionGroup, QFileDialog
 
+from gui.colorer import Colorer
 from utils.errors import ValidationError
 from tiles.tile import Tile
 from tiles.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE
@@ -60,7 +61,7 @@ class TileWidget(QWidget):
             ttype: a tile type whose defined color is to be used
         """
         palette = self.palette()
-        palette.setColor(QPalette.Window, ttype.qcolor)
+        palette.setColor(QPalette.Window, QColor(ttype.color))
         self.setPalette(palette)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
@@ -76,6 +77,8 @@ class Window(QMainWindow):
         super().__init__()
 
         self.map_validator = map_validator
+        self.colorer = Colorer()
+        self.colorer.change_to_profile(self.colorer.color_profile_names[0])
 
         self.setGeometry(300, 300, 600, 400)
         self.setWindowTitle("TD maze builder")
@@ -195,17 +198,56 @@ class Window(QMainWindow):
         options_menu = QMenu('Options', self)
         menubar.addMenu(options_menu)
 
-        # Select the number of neighbors
-        neighbors_menu = options_menu.addMenu('Neigbors')
+        self.add_neighbors_submenu(options_menu)
+        self.add_color_profile_submenu(options_menu)
+
+    def add_neighbors_submenu(self, parent_menu: QMenu) -> None:
+        """
+        Add a submenu in which the number of neighbors for a node is selected.
+
+        Args:
+            parent_menu: a QMenu that this submenu is part of
+        """
+        neighbors_submenu = parent_menu.addMenu('Neigbors')
         self.neighbor_group = QActionGroup(self)
 
         for count in [4, 8]:
             neighbor_action = QAction(str(count), self)
             self.neighbor_group.addAction(neighbor_action)
             neighbor_action.setCheckable(True)
-            neighbors_menu.addAction(neighbor_action)
+            neighbors_submenu.addAction(neighbor_action)
 
         self.neighbor_group.actions()[0].setChecked(True)
+
+    def add_color_profile_submenu(self, parent_menu: QMenu) -> None:
+        """
+        Add a submenu in which the color profile for the GUI is selected.
+
+        Args:
+            parent_menu: a QMenu that this submenu is part of
+        """
+        color_profile_submenu = parent_menu.addMenu('Color Profile')
+        self.color_profile_group = QActionGroup(self)
+
+        for color_profile_name in self.colorer.color_profile_names:
+            color_profile_action = QAction(color_profile_name, self)
+            self.color_profile_group.addAction(color_profile_action)
+            color_profile_action.setCheckable(True)
+            color_profile_submenu.addAction(color_profile_action)
+
+        self.color_profile_group.triggered.connect(self.change_color_profile)
+        self.color_profile_group.actions()[0].setChecked(True)
+
+    def change_color_profile(self) -> None:
+        """
+        Change the colors of the GUI to the currently selected color profile.
+        """
+        color_profile_name = self.color_profile_group.checkedAction().text()
+        self.colorer.change_to_profile(color_profile_name)
+
+        # Update current GUI
+        for tile_widget in self.tile_widgets.flatten():
+            tile_widget.set_type_color(tile_widget.tile.ttype)
 
     def add_help_menu(self, menubar: QMenuBar) -> None:
         help_menu = QMenu('Help', self)
