@@ -78,7 +78,6 @@ class Window(QMainWindow):
 
         self.map_validator = map_validator
         self.colorer = Colorer()
-        self.colorer.change_to_profile(self.colorer.color_profile_names[0])
 
         self.setGeometry(300, 300, 600, 400)
         self.setWindowTitle("TD maze builder")
@@ -88,11 +87,11 @@ class Window(QMainWindow):
         main_layout = QGridLayout()
 
         # Layout for the map
-        grid_widget = QWidget()
-        self.map_grid = QGridLayout()
+        self.grid_widget = QWidget()
+        self.grid_widget.setAutoFillBackground(True)
+        self.map_grid = QGridLayout(self.grid_widget)
         self.map_grid.setSpacing(1)
-        grid_widget.setLayout(self.map_grid)
-        main_layout.addWidget(grid_widget, 0, 0, -1, 3)
+        main_layout.addWidget(self.grid_widget, 0, 0, -1, 3)
 
         # Layout for the parameters
         info_widget = QWidget()
@@ -146,6 +145,10 @@ class Window(QMainWindow):
 
         self.tile_widgets = np.empty((DEFAULT_SIZE, DEFAULT_SIZE), TileWidget)
         self.best_setups = []
+
+        color_profile_name = self.colorer.color_profile_names[0]
+        self.colorer.change_to_profile(color_profile_name)
+        self.change_background_color(color_profile_name)
 
     def create_menubar(self) -> None:
         menubar = self.menuBar()
@@ -238,12 +241,25 @@ class Window(QMainWindow):
         self.color_profile_group.triggered.connect(self.change_color_profile)
         self.color_profile_group.actions()[0].setChecked(True)
 
+    def change_background_color(self, color_profile_name: str) -> None:
+        """
+        Change the background color of the map to the given color profile.
+
+        Args:
+            color_profile_name: the name of a color profile
+        """
+        color = self.colorer.get_background_color(color_profile_name)
+        palette = self.grid_widget.palette()
+        palette.setColor(QPalette.Window, QColor(color))
+        self.grid_widget.setPalette(palette)
+
     def change_color_profile(self) -> None:
         """
         Change the colors of the GUI to the currently selected color profile.
         """
         color_profile_name = self.color_profile_group.checkedAction().text()
         self.colorer.change_to_profile(color_profile_name)
+        self.change_background_color(color_profile_name)
 
         # Update current GUI
         for tile_widget in self.tile_widgets.flatten():
