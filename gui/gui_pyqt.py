@@ -154,7 +154,7 @@ class Window(QMainWindow):
         menubar = self.menuBar()
         self.add_maze_menu(menubar)
         self.add_options_menu(menubar)
-        self.add_help_menu(menubar)
+        #self.add_help_menu(menubar)
 
     def add_maze_menu(self, menubar: QMenuBar) -> None:
         maze_menu = QMenu('Maze', self)
@@ -357,7 +357,7 @@ class Window(QMainWindow):
 
     def run_button_clicked(self) -> None:
         self.disable_buttons(True)
-        t1 = threading.Thread(target=self.initiate_maze_creating)
+        t1 = threading.Thread(target=self.create_maze)
         t1.daemon = True
         t1.start()
 
@@ -371,21 +371,44 @@ class Window(QMainWindow):
         for button in self.buttons:
             button.setDisabled(set_disable)
 
-    def initiate_maze_creating(self):
+    def create_maze(self):
         """
-        Start the validation and maze creation for the current map.
+        Start the validation and optimal mazing for the current map.
         """
-        print('\nValidating map ...')
         neighbor_count = int(self.neighbor_group.checkedAction().text())
         tiles = self.get_tiles()
+        if self.initiate_map_validation(tiles, neighbor_count):
+            self.initiate_optimal_mazing(tiles, neighbor_count)
+
+    def initiate_map_validation(self, tiles: np.ndarray, neighbor_count: int) -> bool:
+        """
+        Initiate the map validation.
+
+        Args:
+            tiles: an array of Tiles
+            neighbor_count: the number of neighbors a Node can have
+
+        Returns:
+            True if the map is valid, else False
+        """
+        print('\nValidating map ...')
         try:
             self.map_validator.validate_map(tiles, neighbor_count)
             print(f'Map validation successful!')
+            return True
         except ValidationError as e:
             print(f'Map validation failed: {e.message}!')
             self.disable_buttons(False)
-            return
+            return False
 
+    def initiate_optimal_mazing(self, tiles: np.ndarray, neighbor_count: int) -> None:
+        """
+        Initiate the optimal mazing, and show one of the solutions.
+
+        Args:
+            tiles: an array of Tiles
+            neighbor_count: the number of neighbors a Node can have
+        """
         print('\nGenerating optimal maze ...')
         max_towers = None
         if self.tower_limiter.isChecked():
@@ -393,6 +416,7 @@ class Window(QMainWindow):
 
         builder = NaiveBuilder(tiles, neighbor_count, max_towers)
         self.best_setups = builder.generate_optimal_mazes()
+
         if self.best_setups:
             maze_count = len(self.best_setups)
             self.variation_label.setText(f'Variations ({maze_count})')
@@ -422,4 +446,3 @@ class Window(QMainWindow):
 
         for coords, node in self.best_setups[index].items():
             self.tile_widgets[coords.x, coords.y].change_to_type(node.ttype)
-        # print('\nMaze generated!')

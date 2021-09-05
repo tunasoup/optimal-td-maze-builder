@@ -2,7 +2,7 @@ import sys
 
 from PyQt5.QtWidgets import QApplication
 
-from gui.map_builder import Window
+from gui.gui_pyqt import Window
 from utils.map_validation import MapValidator2D
 
 if __name__ == '__main__':
