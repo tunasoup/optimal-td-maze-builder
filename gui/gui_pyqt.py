@@ -115,11 +115,11 @@ class Window(QMainWindow):
         # Optional limit for the number of towers
         self.tower_limiter = QCheckBox()
         self.tower_limiter.clicked.connect(self.tower_limiter_clicked)
-        self.max_towers_box = QSpinBox()
-        self.max_towers_box.setMinimum(0)
-        self.max_towers_box.setDisabled(True)
+        self.tower_limit_box = QSpinBox()
+        self.tower_limit_box.setMinimum(0)
+        self.tower_limit_box.setDisabled(True)
         info_layout.addRow(QLabel('Limit towers:'), self.tower_limiter)
-        info_layout.addRow(QLabel('Tower count:'), self.max_towers_box)
+        info_layout.addRow(QLabel('Tower count:'), self.tower_limit_box)
 
         # Run button for initiating the maze construction
         run_button = QPushButton('Run')
@@ -288,7 +288,7 @@ class Window(QMainWindow):
         print('clicked about')
 
     def tower_limiter_clicked(self) -> None:
-        self.max_towers_box.setDisabled(not self.tower_limiter.isChecked())
+        self.tower_limit_box.setDisabled(not self.tower_limiter.isChecked())
 
     def variation_changed(self) -> None:
         index = self.variation_box.value() - 1
@@ -410,11 +410,11 @@ class Window(QMainWindow):
             neighbor_count: the number of neighbors a Node can have
         """
         print('\nGenerating optimal maze ...')
-        max_towers = None
+        tower_limit = None
         if self.tower_limiter.isChecked():
-            max_towers = self.max_towers_box.value()
+            tower_limit = self.tower_limit_box.value()
 
-        builder = NaiveBuilder(tiles, neighbor_count, max_towers)
+        builder = NaiveBuilder(tiles, neighbor_count, tower_limit)
         self.best_setups = builder.generate_optimal_mazes()
 
         if self.best_setups:

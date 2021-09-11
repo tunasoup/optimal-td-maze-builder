@@ -1,16 +1,16 @@
 from abc import ABC
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 
 from tiles.tile import Coords
 from tiles.tile_type import TTypeSpawn, TTypeExit
 from utils.graph_algorithms import tiles_to_nodes, \
-    connect_all_neighboring_nodes, Node
+    connect_all_neighboring_nodes, Node, get_maxmin_distance
 
 
 class MazeBuilder(ABC):
-    def __init__(self, tiles: np.ndarray, neighbor_count: int, max_towers: int = None):
+    def __init__(self, tiles: np.ndarray, neighbor_count: int, tower_limit: int = None):
         """
         An abstract maze builder class. The maze builders try to build the
         optimal maze (long routes, minimal resources) for a given map.
@@ -18,7 +18,7 @@ class MazeBuilder(ABC):
         Args:
             tiles: an array of Tiles
             neighbor_count: the number of neighbors a Node can have
-            max_towers: maximum number of towers allowed in the maze
+            tower_limit: maximum number of towers allowed in the maze
         """
         self.traversables = tiles_to_nodes(tiles[[tile.ttype.is_traversable for tile in tiles]])
         self.build_nodes = {k: v for k, v in self.traversables.items() if
@@ -32,7 +32,9 @@ class MazeBuilder(ABC):
         self.removed = 0
         self.clear_single_paths()
 
-        self.max_towers = max_towers
+        self.max_towers = None
+        self.calculate_max_towers(tower_limit)
+
         self.best_setups = []
 
     def clear_single_paths(self) -> None:
@@ -74,5 +76,34 @@ class MazeBuilder(ABC):
                 if not neighbor:
                     break
 
+    def calculate_max_towers(self, tower_limit: Optional[int]) -> None:
+        """
+        Calculate the maximum number of towers for the map and save that or
+        the given limit to a class variable. The smaller number is saved.
+
+        Args:
+            tower_limit: optional tower limitation
+        """
+        # Find the maxmin distance to determine the possible amount of towers
+        spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
+        maxmin_dist = get_maxmin_distance(spawn_nodes,
+                                          TTypeExit,
+                                          list(self.traversables.values()))
+        build_count = len(self.build_nodes)
+        possible_tower_count = build_count - (maxmin_dist - 1 - self.removed)
+        # todo: what if more than 1 exit, what of when unbuildables
+
+        # Set the largest amount of towers
+        if tower_limit and tower_limit <= possible_tower_count:
+            self.max_towers = tower_limit
+        else:
+            self.max_towers = possible_tower_count
+
     def generate_optimal_mazes(self) -> List[Dict[Coords, Node]]:
+        """
+        Generate a maze where the shortest route is as long as possible.
+
+        Returns:
+            a list of dictionaries with possibly modified traversable Nodes as values
+        """
         raise NotImplementedError

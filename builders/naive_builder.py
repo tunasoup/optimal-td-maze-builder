@@ -12,39 +12,27 @@ from utils.graph_algorithms import Node, get_maxmin_distance, Distances, \
 
 
 class NaiveBuilder(MazeBuilder):
-    def __init__(self, tiles: np.ndarray, neighbor_count: int, max_towers: int = None):
+    def __init__(self, tiles: np.ndarray, neighbor_count: int, tower_limit: int = None):
         """
         Finds the optimal maze by testing every single maze combination.
 
         Args:
             tiles: an array of Tiles
-            max_towers: maximum number of towers allowed in the maze
+            tower_limit: maximum number of towers allowed in the maze
         """
-        super().__init__(tiles, neighbor_count, max_towers)
+        super().__init__(tiles, neighbor_count, tower_limit)
 
     def generate_optimal_mazes(self) -> List[Dict[Coords, Node]]:
         """
-        Generate a maze where the shortest route is as long as possible.
+        Generate a maze where the shortest route is as long as possible by
+        testing every combination.
 
         Returns:
             a list of dictionaries with possibly modified traversable Nodes as values
         """
-        # Find the maxmin distance to determine the possible amount of towers
-        spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
-        maxmin_dist = get_maxmin_distance(spawn_nodes,
-                                          TTypeExit, list(self.traversables.values()))
-        build_count = len(self.build_nodes)
-        possible_tower_count = build_count - (maxmin_dist - 1 - self.removed)
-        # todo: what if more than 1 exit, what of when unbuildables
-
-        # Set the largest amount of towers
-        if self.max_towers and self.max_towers <= possible_tower_count:
-            counter = self.max_towers
-        else:
-            counter = possible_tower_count
-
         # Go through all the possible tower counts to obtain the longest maze
         best_dists = None
+        counter = self.max_towers
         while counter >= 0:
             print(f'Testing combinations with {counter} towers')
             dists, best_setups = self.get_best_tower_combinations(counter)
