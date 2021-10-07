@@ -331,3 +331,25 @@ def get_maxmin_distance(starting_nodes: List[Node], ending_type: Type[TType],
             maxmin_distance = dist
 
     return maxmin_distance
+
+
+def get_cluster_of_nodes(current_node: Node) -> List[Node]:
+    """
+    Recursively find a cluster of nodes that share the same node type. A cluster
+    contains one or more nodes where they are all connected via neighbors.
+
+    Args:
+        current_node: the current node whose neighbors are checked
+
+    Returns:
+        a list of connected nodes, sharing the same tile type
+    """
+    cluster = []
+    current_node.visited = True
+    cluster.append(current_node)
+    node_type = current_node.ttype
+    for neighbor in current_node.neighbors:
+        if neighbor.ttype == node_type and not neighbor.visited:
+            cluster += get_cluster_of_nodes(neighbor)
+
+    return cluster
