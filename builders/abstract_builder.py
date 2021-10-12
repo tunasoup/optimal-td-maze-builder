@@ -1,4 +1,5 @@
 from abc import ABC
+from copy import deepcopy
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -6,7 +7,8 @@ import numpy as np
 from tiles.tile import Coords
 from tiles.tile_type import TTypeSpawn, TTypeExit
 from utils.graph_algorithms import tiles_to_nodes, \
-    connect_all_neighboring_nodes, Node, get_maxmin_distance
+    connect_all_neighboring_nodes, Node, get_maxmin_distance, reset_nodes, \
+    unvisit_nodes
 
 
 class MazeBuilder(ABC):
@@ -27,10 +29,13 @@ class MazeBuilder(ABC):
                              v.ttype == TTypeSpawn]
         self.exit_coords = [k for k, v in self.traversables.items() if
                             v.ttype == TTypeExit]
+        self.unbuildables = {k: v for k, v in self.traversables.items() if
+                             not v.ttype.allow_building}
         connect_all_neighboring_nodes(self.traversables, neighbor_count)
 
-        self.removed = 0
+        self.removed = []
         self.clear_single_paths()
+        print(self.removed)
 
         self.max_towers = None
         self.calculate_max_towers(tower_limit)
@@ -44,6 +49,7 @@ class MazeBuilder(ABC):
         This reduces the number of combinations by ignoring
         unsolvable mazes.
         """
+        unvisit_nodes(list(self.traversables.values()))
         spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
         exit_nodes = [self.traversables[k] for k in self.exit_coords]
 
@@ -51,30 +57,32 @@ class MazeBuilder(ABC):
             neighbors = node.neighbors
             if len(neighbors) != 1:
                 continue
+            node.visited = True
 
-            node = next(iter(neighbors))    # Get the only neighbor Node
-            if node.ttype.is_spawn or node.ttype.is_exit:
-                break
-            if node.ttype.allow_building:
-                del self.build_nodes[node.coords]
-                self.removed += 1
+            current_node = next(iter(neighbors))    # Get the only neighbor Node
+            if current_node.ttype.is_spawn or current_node.ttype.is_exit or current_node.visited:
+                continue
+            if current_node.ttype.allow_building:
+                del self.build_nodes[current_node.coords]
+                self.removed.append(current_node.coords)
+            current_node.visited = True
             prev_node = node
 
-            while len(prev_node.neighbors) == 2:
-                neighbor = None
-                for neighbor in list(prev_node.neighbors):
-                    if neighbor == prev_node:
-                        continue
-                    if neighbor.ttype.is_spawn or neighbor.ttype.is_exit:
-                        break
-                    if neighbor.ttype.allow_building:
-                        del self.build_nodes[neighbor.coords]
-                        self.removed += 1
-                        break
-
-                prev_node = neighbor
-                if not neighbor:
+            while len(current_node.neighbors) == 2:
+                neighbors = list(current_node.neighbors)
+                neighbors.remove(prev_node)
+                neighbor = neighbors[0]
+                if neighbor.visited:
                     break
+                if neighbor.ttype.is_spawn or neighbor.ttype.is_exit:
+                    neighbor.visited = True
+                    break
+                if neighbor.ttype.allow_building:
+                    del self.build_nodes[neighbor.coords]
+                    self.removed.append(neighbor.coords)
+                    prev_node = current_node
+                    current_node = neighbor
+                    current_node.visited = True
 
     def calculate_max_towers(self, tower_limit: Optional[int]) -> None:
         """
@@ -90,8 +98,10 @@ class MazeBuilder(ABC):
                                           TTypeExit,
                                           list(self.traversables.values()))
         build_count = len(self.build_nodes)
-        possible_tower_count = build_count - (maxmin_dist - 1 - self.removed)
-        # todo: what if more than 1 exit, what of when unbuildables
+
+        # todo: currently only reduces tower count in some cases, more thorough check of
+        #  tile types would have to be made on the maxmin_dist route, + possible other checks
+        possible_tower_count = build_count - max(maxmin_dist - len(self.removed) - len(self.unbuildables) + 1, 0)
 
         # Set the largest amount of towers
         if tower_limit and tower_limit <= possible_tower_count:

@@ -8,7 +8,7 @@ from builders import MazeBuilder
 from tiles.tile import Coords
 from tiles.tile_type import TTypeExit, TTypeOccupied
 from utils.graph_algorithms import Node, get_maxmin_distance, Distances, \
-    get_distances
+    get_distances, reset_nodes, unvisit_nodes
 
 
 class NaiveBuilder(MazeBuilder):
@@ -37,6 +37,7 @@ class NaiveBuilder(MazeBuilder):
             print(f'Testing combinations with {counter} towers')
             dists, best_setups = self.get_best_tower_combinations(counter)
             if not dists:
+                counter -= 1
                 continue
 
             if not best_dists or dists > best_dists:
@@ -62,6 +63,7 @@ class NaiveBuilder(MazeBuilder):
         """
         best_dists = None
         best_setups = []
+        unvisit_nodes(list(self.traversables.values()))
 
         combs = combinations(self.build_nodes, tower_count)
         for combination in combs:
