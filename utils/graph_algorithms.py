@@ -207,7 +207,7 @@ def depth_first_search_any_ttype(node, ending_ttype: Type[TType]) -> Node:
 
     for neighbor in node.neighbors:
 
-        if not neighbor.visited:
+        if not neighbor.visited and neighbor.ttype.is_traversable:
 
             if neighbor.ttype == ending_ttype:
                 return neighbor
@@ -238,7 +238,7 @@ def get_shortest_distance_any(starting_node: Node, ending_type: Type[TType],
     while not queue.empty():
         node = queue.get()
         for neighbor in node.neighbors:
-            if not neighbor.visited:
+            if not neighbor.visited and neighbor.ttype.is_traversable:
                 if neighbor.ttype == ending_type:
                     return node.distance + 1
                 neighbor.visited = True
@@ -268,7 +268,7 @@ def get_closest_any(starting_node: Node, ending_type: Type[TType],
     while not queue.empty():
         node = queue.get()
         for neighbor in node.neighbors:
-            if not neighbor.visited:
+            if not neighbor.visited and neighbor.ttype.is_traversable:
                 neighbor.visited = True
                 neighbor.distance = node.distance + 1
                 neighbor.parent = node

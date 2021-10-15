@@ -1,14 +1,12 @@
 from abc import ABC
-from copy import deepcopy
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import numpy as np
 
 from tiles.tile import Coords
 from tiles.tile_type import TTypeSpawn, TTypeExit
 from utils.graph_algorithms import tiles_to_nodes, \
-    connect_all_neighboring_nodes, Node, get_maxmin_distance, reset_nodes, \
-    unvisit_nodes
+    connect_all_neighboring_nodes, get_maxmin_distance, unvisit_nodes
 
 
 class MazeBuilder(ABC):
@@ -31,16 +29,16 @@ class MazeBuilder(ABC):
                             v.ttype == TTypeExit]
         self.unbuildables = {k: v for k, v in self.traversables.items() if
                              not v.ttype.allow_building}
+        self.neighbor_count = neighbor_count
         connect_all_neighboring_nodes(self.traversables, neighbor_count)
 
         self.removed = []
         self.clear_single_paths()
-        print(self.removed)
 
         self.max_towers = None
         self.calculate_max_towers(tower_limit)
 
-        self.best_setups = []
+        self.best_tower_coords = []
 
     def clear_single_paths(self) -> None:
         """
@@ -109,7 +107,7 @@ class MazeBuilder(ABC):
         else:
             self.max_towers = possible_tower_count
 
-    def generate_optimal_mazes(self) -> List[Dict[Coords, Node]]:
+    def generate_optimal_mazes(self) -> List[List[Coords]]:
         """
         Generate a maze where the shortest route is as long as possible.
 

@@ -1,4 +1,3 @@
-from copy import deepcopy
 from itertools import combinations
 from typing import Dict, List, Tuple, Optional
 
@@ -6,9 +5,9 @@ import numpy as np
 
 from builders import MazeBuilder
 from tiles.tile import Coords
-from tiles.tile_type import TTypeExit, TTypeOccupied
-from utils.graph_algorithms import Node, get_maxmin_distance, Distances, \
-    get_distances, reset_nodes, unvisit_nodes
+from tiles.tile_type import TTypeExit, TTypeOccupied, TTypeBasic
+from utils.graph_algorithms import Node, Distances, \
+    get_distances, reset_nodes
 
 
 class NaiveBuilder(MazeBuilder):
@@ -21,8 +20,9 @@ class NaiveBuilder(MazeBuilder):
             tower_limit: maximum number of towers allowed in the maze
         """
         super().__init__(tiles, neighbor_count, tower_limit)
+        self.spawn_nodes = [self.traversables[coords] for coords in self.spawn_coords]
 
-    def generate_optimal_mazes(self) -> List[Dict[Coords, Node]]:
+    def generate_optimal_mazes(self) -> List[List[Coords]]:
         """
         Generate a maze where the shortest route is as long as possible by
         testing every combination.
@@ -32,25 +32,30 @@ class NaiveBuilder(MazeBuilder):
         """
         # Go through all the possible tower counts to obtain the longest maze
         best_dists = None
-        counter = self.max_towers
-        while counter >= 0:
+        counter = 0
+        from time import perf_counter
+        while counter <= self.max_towers:
             print(f'Testing combinations with {counter} towers')
-            dists, best_setups = self.get_best_tower_combinations(counter)
+            start_time = perf_counter()
+            dists, best_tower_coords = self.get_best_tower_combinations(counter)
+            end_time = perf_counter()
+            print(f'{end_time - start_time:.2f} seconds\n')
+
             if not dists:
-                counter -= 1
+                counter += 1
                 continue
 
             if not best_dists or dists > best_dists:
                 best_dists = dists
-                self.best_setups = best_setups
+                self.best_tower_coords = best_tower_coords
             elif dists == best_dists:
-                self.best_setups += best_setups
+                self.best_tower_coords += best_tower_coords
 
-            counter -= 1
+            counter += 1
 
-        return self.best_setups
+        return self.best_tower_coords
 
-    def get_best_tower_combinations(self, tower_count: int) -> (Optional[Distances], List[Dict[Coords, Node]]):
+    def get_best_tower_combinations(self, tower_count: int) -> (Optional[Distances], List[List[Coords]]):
         """
         For every possible tower combination with the given tower amount,
         calculate the spawn-exit Distances, and return the modified Nodes.
@@ -62,24 +67,24 @@ class NaiveBuilder(MazeBuilder):
             longest Distances of the modified map and their Nodes
         """
         best_dists = None
-        best_setups = []
-        unvisit_nodes(list(self.traversables.values()))
+        best_tower_coords = []
+        current_nodes = list(self.traversables.values())
 
         combs = combinations(self.build_nodes, tower_count)
         for combination in combs:
-            current_nodes = deepcopy(self.traversables)
-            current_spawn_nodes = [current_nodes[k] for k in self.spawn_coords]
-            dists = self.calculate_maze_distances(current_spawn_nodes, current_nodes, combination)
+            reset_nodes(current_nodes)
+            dists = self.calculate_maze_distances(self.spawn_nodes, self.traversables, combination)
+            self.revert_to_buildables(self.traversables, combination)
             if not dists:
                 continue
 
             if not best_dists or dists > best_dists:
                 best_dists = dists
-                best_setups = [deepcopy(current_nodes)]
+                best_tower_coords = [list(combination)]
             elif dists == best_dists:
-                best_setups.append(deepcopy(current_nodes))
+                best_tower_coords.append(list(combination))
 
-        return best_dists, best_setups
+        return best_dists, best_tower_coords
 
     def calculate_maze_distances(self, spawn_nodes: List[Node],
                                  current_nodes: Dict[Coords, Node],
@@ -99,8 +104,22 @@ class NaiveBuilder(MazeBuilder):
         for coords in combination:
             node = current_nodes[coords]
             node.ttype = TTypeOccupied
-            node.remove_all_undirected()
 
         dists = get_distances(spawn_nodes, TTypeExit, list(current_nodes.values()))
 
         return dists
+
+    def revert_to_buildables(self, current_nodes: Dict[Coords, Node],
+                             combination: Tuple[Coords]) -> None:
+        """
+        Mark the given coordinates as buildables.
+
+        Meant to undo the effects of calculate_maze_distances().
+
+        Args:
+            current_nodes: a dictionary of all the Nodes currently in the graph
+            combination: a tuple of Coords which mark the nodes
+        """
+        for coords in combination:
+            node = current_nodes[coords]
+            node.ttype = TTypeBasic

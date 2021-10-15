@@ -8,12 +8,13 @@ from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox, QCheckBox, QMenu, QAction, QMenuBar, \
     QActionGroup, QFileDialog
 
-from gui.colorer import Colorer
-from utils.errors import ValidationError
-from tiles.tile import Tile
-from tiles.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE
-from utils.map_validation import MapValidator
 from builders import NaiveBuilder
+from gui.colorer import Colorer
+from tiles.tile import Tile
+from tiles.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE, \
+    TTypeOccupied, TTypeBasic
+from utils.errors import ValidationError
+from utils.map_validation import MapValidator
 
 DEFAULT_SIZE = 6
 MINIMUM_SIZE = 2
@@ -144,7 +145,8 @@ class Window(QMainWindow):
         self.buttons = [build_button, run_button]
 
         self.tile_widgets = np.empty((DEFAULT_SIZE, DEFAULT_SIZE), TileWidget)
-        self.best_setups = []
+        self.previous_index = None
+        self.best_tower_coords = []
 
         color_profile_name = self.colorer.color_profile_names[0]
         self.colorer.change_to_profile(color_profile_name)
@@ -344,7 +346,7 @@ class Window(QMainWindow):
         for tilew in self.tile_widgets.flatten():
             self.map_grid.removeWidget(tilew)
 
-        self.best_setups = []
+        self.best_tower_coords = []
 
     def get_tiles(self) -> np.ndarray:
         tiles = np.empty(np.size(self.tile_widgets), Tile)
@@ -357,6 +359,7 @@ class Window(QMainWindow):
 
     def run_button_clicked(self) -> None:
         self.disable_buttons(True)
+        self.variation_box.setDisabled(True)
         t1 = threading.Thread(target=self.create_maze)
         t1.daemon = True
         t1.start()
@@ -415,17 +418,19 @@ class Window(QMainWindow):
             tower_limit = self.tower_limit_box.value()
 
         builder = NaiveBuilder(tiles, neighbor_count, tower_limit)
-        self.best_setups = builder.generate_optimal_mazes()
+        self.best_tower_coords = builder.generate_optimal_mazes()
 
-        if self.best_setups:
-            maze_count = len(self.best_setups)
+        if self.best_tower_coords:
+            maze_count = len(self.best_tower_coords)
             self.variation_label.setText(f'Variations ({maze_count})')
             self.variation_box.setMaximum(maze_count)
 
-            # Show the final variation which has least towers
-            if self.variation_box.value() == maze_count:
-                self.show_variation(maze_count - 1)
-            self.variation_box.setValue(maze_count)
+            # Show the variation which has the least towers
+            self.previous_index = None
+            index = 0
+            if self.variation_box.value() == index + 1:
+                self.show_variation(index)
+            self.variation_box.setValue(index + 1)
             self.variation_box.setDisabled(False)
 
         else:
@@ -440,9 +445,18 @@ class Window(QMainWindow):
         Args:
             index: index of the best maze setup
         """
-        if index >= len(self.best_setups) or index < 0:
+        if index >= len(self.best_tower_coords) or index < 0:
             print('Variation does not exist!')
             return
 
-        for coords, node in self.best_setups[index].items():
-            self.tile_widgets[coords.x, coords.y].change_to_type(node.ttype)
+        # Remove the towers of the previous setup
+        # todo: not removed when digits are added manually e.g. 1 -> 15 -> 156
+        if self.previous_index:
+            for coords in self.best_tower_coords[self.previous_index]:
+                self.tile_widgets[coords.x, coords.y].change_to_type(TTypeBasic)
+
+        # Add the new towers
+        for coords in self.best_tower_coords[index]:
+            self.tile_widgets[coords.x, coords.y].change_to_type(TTypeOccupied)
+
+        self.previous_index = index
