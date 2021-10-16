@@ -6,7 +6,8 @@ import numpy as np
 from tiles.tile import Coords
 from tiles.tile_type import TTypeSpawn, TTypeExit
 from utils.graph_algorithms import tiles_to_nodes, \
-    connect_all_neighboring_nodes, get_maxmin_distance, unvisit_nodes
+    connect_all_neighboring_nodes, get_maxmin_distance, unvisit_nodes, \
+    get_cluster_of_nodes, get_center_coords, get_surrounded_coords
 
 
 class MazeBuilder(ABC):
@@ -34,6 +35,10 @@ class MazeBuilder(ABC):
 
         self.removed = []
         self.clear_single_paths()
+
+        # print(self.spawn_coords)
+        self.clear_redundant_spawns()
+        # print(self.spawn_coords)
 
         self.max_towers = None
         self.calculate_max_towers(tower_limit)
@@ -82,6 +87,37 @@ class MazeBuilder(ABC):
                     current_node = neighbor
                     current_node.visited = True
 
+    def clear_redundant_spawns(self) -> None:
+        """
+        Remove reduntant spawn nodes from the list of spawn nodes.
+        A spawn is considered redundant if removing it does not change
+        the result of the optimal maze. Only spawns in clusters are checked.
+
+        Having fewer spawns reduces the amount of computed graph algorithms.
+        """
+        if len(self.spawn_coords) < 2:
+            return
+
+        spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
+        unvisit_nodes(spawn_nodes)
+        unvisited_spawn_nodes = set(spawn_nodes)
+        redundant_spawn_coords = set()
+        for node in spawn_nodes:
+
+            if node not in unvisited_spawn_nodes:
+                continue
+
+            cluster = get_cluster_of_nodes(node)
+            if len(cluster) < 2:
+                continue
+            unvisited_spawn_nodes = unvisited_spawn_nodes.difference(cluster)
+            center_coords = get_center_coords(cluster)
+            redundant_spawn_coords.update(center_coords)
+            surrounded_coords = get_surrounded_coords(cluster)
+            redundant_spawn_coords.update(surrounded_coords)
+
+        self.spawn_coords = [coords for coords in self.spawn_coords if coords not in redundant_spawn_coords]
+
     def calculate_max_towers(self, tower_limit: Optional[int]) -> None:
         """
         Calculate the maximum number of towers for the map and save that or
@@ -102,7 +138,7 @@ class MazeBuilder(ABC):
         possible_tower_count = build_count - max(maxmin_dist - len(self.removed) - len(self.unbuildables) + 1, 0)
 
         # Set the largest amount of towers
-        if tower_limit and tower_limit <= possible_tower_count:
+        if (tower_limit or tower_limit == 0) and tower_limit <= possible_tower_count:
             self.max_towers = tower_limit
         else:
             self.max_towers = possible_tower_count

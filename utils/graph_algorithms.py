@@ -353,3 +353,58 @@ def get_cluster_of_nodes(current_node: Node) -> List[Node]:
             cluster += get_cluster_of_nodes(neighbor)
 
     return cluster
+
+
+def get_center_coords(nodes: List[Node]) -> List[Coords]:
+    """
+    Find coordinates of those nodes, who have neighbors of the same node type
+    on both sides on any axis.
+
+    Args:
+        nodes: a list of nodes to check
+
+    Returns:
+        a list of coordinates equivalent to center nodes of a cluster
+    """
+    center_coords = []
+    for node in nodes:
+        same_neighbor_coords = [neighbor.coords for neighbor in node.neighbors
+                                if neighbor.ttype == node.ttype]
+        x_coords = [coords.x for coords in same_neighbor_coords]
+        y_coords = [coords.y for coords in same_neighbor_coords]
+        x_max = max(x_coords)
+        x_min = min(x_coords)
+        y_max = max(y_coords)
+        y_min = min(y_coords)
+        x = node.coords.x
+        y = node.coords.y
+        if x_min < x < x_max or y_min < y < y_max:
+            center_coords.append(node.coords)
+
+    return center_coords
+
+
+def get_surrounded_coords(nodes: List[Node]) -> List[Coords]:
+    """
+    Find coordinates of those nodes, whose every neighbor has the same node
+    type as the node itself.
+
+    Args:
+        nodes: a list of nodes to check
+
+    Returns:
+        a list of coordinates equivalent to surrounded nodes in a cluster
+    """
+    surrounded_coords = []
+    for node in nodes:
+        neighbor_ttypes = [neighbor.ttype for neighbor in node.neighbors]
+        surrounded = True
+        for ttype in neighbor_ttypes:
+            if ttype != node.ttype:
+                surrounded = False
+                break
+        if surrounded:
+            surrounded_coords.append(node.coords)
+
+    return surrounded_coords
+
