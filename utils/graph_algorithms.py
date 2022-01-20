@@ -25,7 +25,6 @@ class Node:
         self._ttype = ttype
         self._visited = False
         self._distance = 0
-        self._prequel = None
         self.neighbors: Set["Node"] = set()
 
     @property
@@ -59,14 +58,6 @@ class Node:
     @distance.setter
     def distance(self, dist: int) -> None:
         self._distance = dist
-
-    @property
-    def prequel(self) -> "Node":
-        return self._prequel
-
-    @prequel.setter
-    def prequel(self, preq: "Node") -> None:
-        self._prequel = preq
 
     def connect_undirected(self, node: "Node") -> None:
         self.neighbors.add(node)
@@ -174,7 +165,6 @@ def reset_node(node: Node) -> None:
     """
     node.visited = False
     node.distance = 0
-    node.prequel = 0
 
 
 def unvisit_nodes(nodes: List[Node]) -> None:
@@ -243,7 +233,6 @@ def get_shortest_distance_any(starting_node: Node, ending_type: Type[TType],
                     return node.distance + 1
                 neighbor.visited = True
                 neighbor.distance = node.distance + 1
-                neighbor.parent = node
                 queue.put(neighbor)
 
 
@@ -271,11 +260,117 @@ def get_closest_any(starting_node: Node, ending_type: Type[TType],
             if not neighbor.visited and neighbor.ttype.is_traversable:
                 neighbor.visited = True
                 neighbor.distance = node.distance + 1
-                neighbor.parent = node
 
                 if neighbor.ttype == ending_type:
                     return neighbor
                 queue.put(neighbor)
+
+
+def get_nodes_on_shortest_paths_multiple(starting_nodes: List[Node], ending_type: Type[TType],
+                                         current_nodes: List[Node]) -> (Optional[Distances], Optional[Set[Node]]):
+    """
+    Find all the Nodes that are on a possible shortest path to the given tile
+    type, from all the given starting nodes.
+
+    Args:
+        starting_nodes: a list of starting nodes
+        ending_type: a tile type to end a path on
+        current_nodes: a list of Nodes currently in the graph which are
+                       needed for resetting
+
+    Returns:
+        the distance of a shortest path, and all the Nodes on all the shortest
+        path from very starting Node, or None for both if there are no paths
+    """
+    dists = Distances()
+    path_nodes = set()
+
+    for starting_node in starting_nodes:
+        reset_nodes(current_nodes)
+        dist, nodes = get_nodes_on_shortest_paths(starting_node, ending_type,
+                                                  len(current_nodes))
+
+        # End early on unsolvable mazes
+        if not dist:
+            return dist, nodes
+
+        dists.append(dist)
+        path_nodes.update(nodes)
+
+    return dists, path_nodes
+
+
+def get_nodes_on_shortest_paths(starting_node: Node, ending_type: Type[TType],
+                                node_count: int) -> (Optional[int], Optional[Set[Node]]):
+    """
+    Find all the Nodes that are on a possible shortest path to the given tile
+    type, for the given single starting Nodes.
+
+    Args:
+        starting_node: a starting Node
+        ending_type: a tile type to end a path on
+        node_count: maximum number of Nodes in a Queue
+
+    Returns:
+        the distance of a shortest path, and all the Nodes on all the shortest
+        path, or None for both if there are no paths
+    """
+    starting_node.visited = True
+    starting_node.distance = 0
+    queue = Queue(maxsize=node_count - 1)
+    queue.put(starting_node)
+    while not queue.empty():
+        node = queue.get()
+        if node.ttype == ending_type:
+            distance = node.distance
+            path_nodes = collect_all_paths(node, set())
+
+            # Look for other ending Nodes with the same distance
+            while not queue.empty():
+                node = queue.get()
+                if node.ttype == ending_type:
+                    path_nodes.update(collect_all_paths(node, set()))
+                if node.distance > distance:
+                    break
+
+            return distance, path_nodes
+
+        for neighbor in node.neighbors:
+            if not neighbor.visited and neighbor.ttype.is_traversable:
+                neighbor.visited = True
+                neighbor.distance = node.distance + 1
+
+                queue.put(neighbor)
+
+    return None, None
+
+
+def collect_all_paths(node: Node, collected: Set[Node]) -> Set[Node]:
+    """
+    Collect all the traversable Nodes on all the possible paths to the given
+    Node using recursive depth-first-search. The starting Node of a path is
+    assumed to have a distance of 0.
+
+    Args:
+        node: final Node on a path
+        collected: a set of collected Notes
+
+    Returns:
+        a list of collected Notes on the path towards 0 distance.
+    """
+    for neighbor in node.neighbors:
+
+        if neighbor.ttype.is_traversable and neighbor.distance == node.distance - 1\
+                and neighbor not in collected:
+
+            if neighbor.distance == 0:
+                continue
+
+            collected.add(neighbor)
+
+            collected = collect_all_paths(neighbor, collected)
+
+    return collected
 
 
 def get_distances(starting_nodes: List[Node], ending_type: Type[TType],
