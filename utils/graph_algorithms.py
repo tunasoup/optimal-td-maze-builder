@@ -27,6 +27,17 @@ class Node:
         self._distance = 0
         self.neighbors: Set["Node"] = set()
 
+    def __eq__(self, other):
+        if isinstance(other, Node):
+            return self._coords == other._coords
+        return self._coords == other
+
+    def __hash__(self):
+        return hash(self._coords)
+
+    def __repr__(self):
+        return f'<Node at {self._coords} {self._ttype}>'
+
     @property
     def coords(self) -> Coords:
         return self._coords
