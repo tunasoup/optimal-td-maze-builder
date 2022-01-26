@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox, QCheckBox, QMenu, QAction, QMenuBar, \
     QActionGroup, QFileDialog
 
-from builders import NaiveBuilder
+from builders import CutoffBuilder, NaiveBuilder
 from gui.colorer import Colorer
 from tiles.tile import Tile
 from tiles.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE, \
@@ -417,7 +417,8 @@ class Window(QMainWindow):
         if self.tower_limiter.isChecked():
             tower_limit = self.tower_limit_box.value()
 
-        builder = NaiveBuilder(tiles, neighbor_count, tower_limit)
+        #builder = NaiveBuilder(tiles, neighbor_count, tower_limit)
+        builder = CutoffBuilder(tiles, neighbor_count, tower_limit)
         self.best_tower_coords = builder.generate_optimal_mazes()
 
         if self.best_tower_coords:
@@ -425,13 +426,15 @@ class Window(QMainWindow):
             self.variation_label.setText(f'Variations ({maze_count})')
             self.variation_box.setMaximum(maze_count)
 
-            # Show the variation which has the least towers
+            # Show the variation which has the least towers (only for NaiveBuilder)
             self.previous_index = None
             index = 0
             if self.variation_box.value() == index + 1:
                 self.show_variation(index)
-            self.variation_box.setValue(index + 1)
+            self.variation_box.setValue(index + 1)  # TODO Has a chance to crash
+            # todo: after changing a variation and tiles and running
             self.variation_box.setDisabled(False)
+            print('\nMaze generated!')
 
         else:
             print('\nCannot create a maze!')
@@ -450,8 +453,7 @@ class Window(QMainWindow):
             return
 
         # Remove the towers of the previous setup
-        # todo: not removed when digits are added manually e.g. 1 -> 15 -> 156
-        if self.previous_index:
+        if self.previous_index is not None:
             for coords in self.best_tower_coords[self.previous_index]:
                 self.tile_widgets[coords.x, coords.y].change_to_type(TTypeBasic)
 
