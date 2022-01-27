@@ -1,62 +1,52 @@
 from abc import ABC
-from typing import List, Optional
-
-import numpy as np
+from typing import List, Optional, Dict
 
 from tiles.tile import Coords
-from tiles.tile_type import TTypeSpawn, TTypeExit
-from utils.graph_algorithms import tiles_to_nodes, \
-    connect_all_neighboring_nodes, get_maxmin_distance, unvisit_nodes, \
-    get_cluster_of_nodes, get_center_coords, get_surrounded_coords
+from tiles.tile_type import TTypeExit
+from utils.graph_algorithms import get_maxmin_distance, unvisit_nodes, \
+    get_cluster_of_nodes, get_center_coords, get_surrounded_coords, Node
 
 
 class MazeBuilder(ABC):
-    def __init__(self, tiles: np.ndarray, neighbor_count: int, tower_limit: int = None):
+    def __init__(self, coordinated_nodes: Dict[Coords, Node], tower_limit: Optional[int] = None):
         """
         An abstract maze builder class. The maze builders try to build the
-        optimal maze (long routes, minimal resources) for a given map.
+        optimal maze (longest possible paths with minimal resources) for a given map.
 
         Args:
-            tiles: an array of Tiles
-            neighbor_count: the number of neighbors a Node can have
+            coordinated_nodes: the (Coords and) Nodes of the maze
             tower_limit: maximum number of towers allowed in the maze
         """
-        self.traversables = tiles_to_nodes(tiles[[tile.ttype.is_traversable for tile in tiles]])
-        self.build_nodes = {k: v for k, v in self.traversables.items() if
-                            v.ttype.allow_building}
-        self.spawn_coords = [k for k, v in self.traversables.items() if
-                             v.ttype == TTypeSpawn]
-        self.exit_coords = [k for k, v in self.traversables.items() if
-                            v.ttype == TTypeExit]
-        self.unbuildables = {k: v for k, v in self.traversables.items() if
-                             not v.ttype.allow_building}
-        self.neighbor_count = neighbor_count
-        connect_all_neighboring_nodes(self.traversables, neighbor_count)
+        self.coordinated_traversables = {k: v for k, v in coordinated_nodes.items() if v.ttype.is_traversable}
+        self.coordinated_build_nodes = {k: v for k, v in self.coordinated_traversables.items() if
+                                        v.ttype.allow_building}
+        self.coordinated_unbuildables = {k: v for k, v in self.coordinated_traversables.items() if
+                                         not v.ttype.allow_building}
+        self.spawn_nodes = [v for k, v in self.coordinated_traversables.items()
+                            if v.ttype.is_spawn]
+        self.exit_nodes = [v for k, v in self.coordinated_traversables.items()
+                           if v.ttype.is_exit]
 
         self.removed = []
         self.clear_single_paths()
 
-        # print(self.spawn_coords)
         self.clear_redundant_spawns()
-        # print(self.spawn_coords)
 
-        self.max_towers = None
+        self.max_towers = 0
         self.calculate_max_towers(tower_limit)
 
         self.best_tower_coords = []
 
     def clear_single_paths(self) -> None:
         """
-        Remove a traversable path from the list of build nodes, if it is the
+        Remove a traversable path from the list of build coordinate_nodes, if it is the
         only path that can be taken.
         This reduces the number of combinations by ignoring
         unsolvable mazes.
         """
-        unvisit_nodes(list(self.traversables.values()))
-        spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
-        exit_nodes = [self.traversables[k] for k in self.exit_coords]
+        unvisit_nodes(list(self.coordinated_traversables.values()))
 
-        for node in spawn_nodes + exit_nodes:
+        for node in self.spawn_nodes + self.exit_nodes:
             neighbors = node.neighbors
             if len(neighbors) != 1:
                 continue
@@ -66,7 +56,7 @@ class MazeBuilder(ABC):
             if current_node.ttype.is_spawn or current_node.ttype.is_exit or current_node.visited:
                 continue
             if current_node.ttype.allow_building:
-                del self.build_nodes[current_node.coords]
+                del self.coordinated_build_nodes[current_node.coords]
                 self.removed.append(current_node.coords)
             current_node.visited = True
             prev_node = node
@@ -81,7 +71,7 @@ class MazeBuilder(ABC):
                     neighbor.visited = True
                     break
                 if neighbor.ttype.allow_building:
-                    del self.build_nodes[neighbor.coords]
+                    del self.coordinated_build_nodes[neighbor.coords]
                     self.removed.append(neighbor.coords)
                     prev_node = current_node
                     current_node = neighbor
@@ -89,20 +79,19 @@ class MazeBuilder(ABC):
 
     def clear_redundant_spawns(self) -> None:
         """
-        Remove reduntant spawn nodes from the list of spawn nodes.
+        Remove reduntant spawn Nodes from the list of spawn coordinate_nodes.
         A spawn is considered redundant if removing it does not change
         the result of the optimal maze. Only spawns in clusters are checked.
 
         Having fewer spawns reduces the amount of computed graph algorithms.
         """
-        if len(self.spawn_coords) < 2:
+        if len(self.spawn_nodes) < 2:
             return
 
-        spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
-        unvisit_nodes(spawn_nodes)
-        unvisited_spawn_nodes = set(spawn_nodes)
+        unvisit_nodes(self.spawn_nodes)
+        unvisited_spawn_nodes = set(self.spawn_nodes)
         redundant_spawn_coords = set()
-        for node in spawn_nodes:
+        for node in self.spawn_nodes:
 
             if node not in unvisited_spawn_nodes:
                 continue
@@ -116,7 +105,7 @@ class MazeBuilder(ABC):
             surrounded_coords = get_surrounded_coords(cluster)
             redundant_spawn_coords.update(surrounded_coords)
 
-        self.spawn_coords = [coords for coords in self.spawn_coords if coords not in redundant_spawn_coords]
+        self.spawn_nodes = [node for node in self.spawn_nodes if node.coords not in redundant_spawn_coords]
 
     def calculate_max_towers(self, tower_limit: Optional[int]) -> None:
         """
@@ -127,15 +116,15 @@ class MazeBuilder(ABC):
             tower_limit: optional tower limitation
         """
         # Find the maxmin distance to determine the possible amount of towers
-        spawn_nodes = [self.traversables[k] for k in self.spawn_coords]
-        maxmin_dist = get_maxmin_distance(spawn_nodes,
+        maxmin_dist = get_maxmin_distance(self.spawn_nodes,
                                           TTypeExit,
-                                          list(self.traversables.values()))
-        build_count = len(self.build_nodes)
+                                          list(self.coordinated_traversables.values()))
+
+        build_count = len(self.coordinated_build_nodes)
 
         # todo: currently only reduces tower count in some cases, more thorough check of
-        #  tile types would have to be made on the maxmin_dist route, + possible other checks
-        possible_tower_count = build_count - max(maxmin_dist - len(self.removed) - len(self.unbuildables) + 1, 0)
+        #  tile types would have to be made on the maxmin_dist path, + possible other checks
+        possible_tower_count = build_count - max(maxmin_dist - len(self.removed) - len(self.coordinated_unbuildables) + 1, 0)
 
         # Set the largest amount of towers
         if (tower_limit or tower_limit == 0) and tower_limit <= possible_tower_count:
@@ -145,7 +134,7 @@ class MazeBuilder(ABC):
 
     def generate_optimal_mazes(self) -> List[List[Coords]]:
         """
-        Generate a maze where the shortest route is as long as possible.
+        Generate a maze where the shortest path is as long as possible.
 
         Returns:
             a list of dictionaries with possibly modified traversable Nodes as values

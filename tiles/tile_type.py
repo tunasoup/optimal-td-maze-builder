@@ -1,8 +1,6 @@
 from abc import ABC
 from typing import Dict, Type
 
-from PyQt5.QtGui import QColor
-
 
 class TType(ABC):
     name = NotImplemented
@@ -68,8 +66,8 @@ class TTypeOccupied(TType):
     is_exit = False
 
 
-class TTypeRoute(TType):
-    name = 'route'
+class TTypePath(TType):
+    name = 'path'
     allow_building = True
     is_removable = False
     is_traversable = True
@@ -84,7 +82,7 @@ TTYPES = {
     'spawn': TTypeSpawn,
     'exit': TTypeExit,
     'occupied': TTypeOccupied,
-    'route': TTypeRoute,
+    'path': TTypePath,
 }
 
 TILE_ROTATION: Dict[Type[TType], Type[TType]] = {

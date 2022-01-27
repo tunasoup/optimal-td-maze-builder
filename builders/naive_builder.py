@@ -1,8 +1,6 @@
 from itertools import combinations
 from typing import Dict, List, Tuple, Optional
 
-import numpy as np
-
 from builders import MazeBuilder
 from tiles.tile import Coords
 from tiles.tile_type import TTypeExit, TTypeOccupied, TTypeBasic
@@ -11,20 +9,19 @@ from utils.graph_algorithms import Node, Distances, \
 
 
 class NaiveBuilder(MazeBuilder):
-    def __init__(self, tiles: np.ndarray, neighbor_count: int, tower_limit: int = None):
+    def __init__(self, coordinated_nodes: Dict[Coords, Node], tower_limit: Optional[int] = None):
         """
         Finds the optimal maze by testing every single maze combination.
 
         Args:
-            tiles: an array of Tiles
+            coordinated_nodes: the (Coords and) Nodes of the maze
             tower_limit: maximum number of towers allowed in the maze
         """
-        super().__init__(tiles, neighbor_count, tower_limit)
-        self.spawn_nodes = [self.traversables[coords] for coords in self.spawn_coords]
+        super().__init__(coordinated_nodes, tower_limit)
 
     def generate_optimal_mazes(self) -> List[List[Coords]]:
         """
-        Generate a maze where the shortest route is as long as possible by
+        Generate a maze where the shortest path is as long as possible by
         testing every combination.
 
         Returns:
@@ -68,13 +65,13 @@ class NaiveBuilder(MazeBuilder):
         """
         best_dists = None
         best_tower_coords = []
-        current_nodes = list(self.traversables.values())
+        current_nodes = list(self.coordinated_traversables.values())
 
-        combs = combinations(self.build_nodes, tower_count)
+        combs = combinations(self.coordinated_build_nodes, tower_count)
         for combination in combs:
             reset_nodes(current_nodes)
-            dists = self.calculate_maze_distances(self.spawn_nodes, self.traversables, combination)
-            self.revert_to_buildables(self.traversables, combination)
+            dists = self.calculate_maze_distances(self.spawn_nodes, self.coordinated_traversables, combination)
+            self.revert_to_buildables(self.coordinated_traversables, combination)
             if not dists:
                 continue
 
@@ -94,7 +91,7 @@ class NaiveBuilder(MazeBuilder):
         between spawns and any exit Nodes.
 
         Args:
-            spawn_nodes: a list of spawn nodes
+            spawn_nodes: a list of spawn coordinate_nodes
             current_nodes: a dictionary of all the Nodes currently in the graph
             combination: a tuple of Coords which mark the towers
 
@@ -118,7 +115,7 @@ class NaiveBuilder(MazeBuilder):
 
         Args:
             current_nodes: a dictionary of all the Nodes currently in the graph
-            combination: a tuple of Coords which mark the nodes
+            combination: a tuple of Coords which mark the coordinate_nodes
         """
         for coords in combination:
             node = current_nodes[coords]

@@ -1,13 +1,11 @@
 from abc import ABC, abstractmethod
-from collections import defaultdict
 
 import numpy as np
 
+from tiles.tile_type import TTypeSpawn, TTypeExit
 from utils.errors import ValidationError
 from utils.graph_algorithms import depth_first_search_any_ttype, \
-    tiles_to_nodes, \
-    connect_all_neighboring_nodes, reset_nodes, get_cluster_of_nodes
-from tiles.tile_type import TTypeBasic, TTypeUnbuildable, TTypeSpawn, TTypeExit
+    reset_nodes, get_cluster_of_nodes
 
 
 class MapValidator(ABC):
@@ -17,44 +15,34 @@ class MapValidator(ABC):
     """
 
     def __init__(self):
-        self.tiles = None
         self.traversables = None
         self.spawns = None
         self.exits = None
 
-    def validate_map(self, tiles: np.ndarray, neighbor_count: int):
+    def validate_map(self, nodes: np.ndarray):
         """
         Initiate the validation of a built map, whose subfunctions raise an
         error if the map is flawed.
 
         Args:
-            tiles: an array of Tiles
-            neighbor_count: the number of neighbors a Node can have
+            nodes: an array of Nodes
         """
-        self.divide_types(tiles)
+        self.divide_types(nodes)
 
         self.validate_spawns()
         self.validate_exits()
-        self.validate_route(neighbor_count)
+        self.validate_path()
 
-    def divide_types(self, tiles: np.ndarray) -> None:
+    def divide_types(self, nodes: np.ndarray) -> None:
         """
-        Divide the tiles according to their tile type.
+        Divide the coordinated_nodes according to their tile type.
 
         Args:
-            tiles: an array of Tiles
+            nodes: an array of Nodes
         """
-        ttypes = defaultdict(list)
-
-        for tile in tiles:
-            ttypes[tile.ttype.name].append(tile)
-
-        basics = np.array(ttypes[TTypeBasic.name])
-        unbuildables = np.array(ttypes[TTypeUnbuildable.name])
-        self.spawns = np.array(ttypes[TTypeSpawn.name])
-        self.exits = np.array(ttypes[TTypeExit.name])
-        self.traversables = np.concatenate((basics, unbuildables, self.spawns,
-                                           self.exits))
+        self.spawns = np.array([node for node in nodes if node.ttype.is_spawn])
+        self.exits = np.array([node for node in nodes if node.ttype.is_exit])
+        self.traversables = np.array([node for node in nodes if node.ttype.is_traversable])
 
     def validate_spawns(self) -> None:
         """
@@ -71,13 +59,10 @@ class MapValidator(ABC):
             raise ValidationError('not enough exits')
 
     @abstractmethod
-    def validate_route(self, neighbor_count: int) -> None:
+    def validate_path(self) -> None:
         """
-        Check that there is a route for the enemies, so that they can
+        Check that there is a path for the enemies, so that they can
         reach the exit(s).
-
-        Args:
-            neighbor_count: the number of neighbors a Node can have
         """
         raise NotImplementedError()
 
@@ -87,49 +72,41 @@ class MapValidator2D(MapValidator):
     Validates a 2D map where a spawn or an exit cannot be blocked.
     """
 
-    def validate_route(self, neighbor_count: int):
+    def validate_path(self):
         """
         Raise an error if any spawn or exit is not connected to at least one
         counterpart.
-
-        Args:
-            neighbor_count: the number of neighbors a Node can have
         """
-        nodes = tiles_to_nodes(self.traversables)
-        spawn_nodes = [node for node in nodes.values() if node.ttype == TTypeSpawn]
-        exit_nodes = [node for node in nodes.values() if node.ttype == TTypeExit]
-        connect_all_neighboring_nodes(nodes, neighbor_count)
-
         # Look for spawn clusters
-        current_spawns = set(spawn_nodes)
+        current_spawns = set(self.spawns)
         if len(self.spawns) > 1:
-            reset_nodes(list(nodes.values()))
-            for node in spawn_nodes:
+            reset_nodes(self.traversables)
+            for node in self.spawns:
                 if node not in current_spawns:
                     continue
                 cluster = get_cluster_of_nodes(node)
 
-                # Only need the first (any) node of a cluster for validation
+                # Only need the first (any) Node of a cluster for validation
                 if len(cluster) > 1:
                     cluster = cluster[1:]
                     current_spawns = current_spawns.difference(cluster)
 
-        # Validate a route for all the spawn clusters
+        # Validate a path for all the spawn clusters
         found_exits = set()
         for spawn in current_spawns:
-            reset_nodes(list(nodes.values()))
+            reset_nodes(self.traversables)
             exit_node = depth_first_search_any_ttype(spawn, TTypeExit)
             if not exit_node:
                 raise ValidationError('a spawn is blocked')
             found_exits.add(exit_node)
 
-        # Only validate the exit tiles that were not already found
-        remaining_exits = {node for node in exit_nodes if node not in found_exits}
+        # Only validate the exit coordinated_nodes that were not already found
+        remaining_exits = {node for node in self.exits if node not in found_exits}
         current_exits = remaining_exits
 
         # Look for clusters of found exits
         if remaining_exits:
-            reset_nodes(list(nodes.values()))
+            reset_nodes(self.traversables)
             for node in remaining_exits:
                 if node not in current_exits:
                     continue
@@ -140,16 +117,14 @@ class MapValidator2D(MapValidator):
                     current_exits = current_exits.difference(cluster)
                     found_exits.update(cluster)
 
-                # Only need the first (any) node of a cluster for validation
+                # Only need the first (any) Node of a cluster for validation
                 elif len(cluster) > 1:
                     cluster = cluster[1:]
                     current_exits = current_exits.difference(cluster)
 
-        exit_coords = [node.coords for node in current_exits]
-
-        # Validate a route for the remaining exit clusters
-        for coords in exit_coords:
-            reset_nodes(list(nodes.values()))
-            spawn_node = depth_first_search_any_ttype(nodes[coords], TTypeSpawn)
+        # Validate a path for the remaining exit clusters
+        for exit_node in current_exits:
+            reset_nodes(self.traversables)
+            spawn_node = depth_first_search_any_ttype(exit_node, TTypeSpawn)
             if not spawn_node:
                 raise ValidationError('an exit is blocked')

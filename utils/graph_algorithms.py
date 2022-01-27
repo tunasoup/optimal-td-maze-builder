@@ -98,6 +98,9 @@ class Distances:
         """
         self.dists = []
 
+    def __repr__(self):
+        return f'<Distances {self.dists}>'
+
     def append(self, item: int) -> None:
         self.dists.append(item)
 
@@ -128,7 +131,7 @@ def tiles_to_nodes(tiles: np.ndarray) -> Dict[Coords, Node]:
         tiles: an array of Tiles
 
     Returns:
-        a dictionary with coordinates as keys and Nodes as values
+        a dictionary with Coords as keys and Nodes as values
     """
     nodes = {}
     for tile in tiles:
@@ -139,21 +142,21 @@ def tiles_to_nodes(tiles: np.ndarray) -> Dict[Coords, Node]:
     return nodes
 
 
-def connect_all_neighboring_nodes(nodes: Dict[Coords, Node], neighbor_count: int) -> None:
+def connect_all_neighboring_nodes(coordinate_nodes: Dict[Coords, Node], neighbor_count: int) -> None:
     """
     Connect all the given Nodes together, so that a single Node is
     connected to its 4 or 8 possible neighbors.
 
     Args:
-        nodes: a dictionary with the connectable Nodes as values
+        coordinate_nodes: a dictionary with Coords as keys and connectable Nodes as values
         neighbor_count: the number of neighbors a Node can have
     """
     deltas = NEIGHBOR_DELTAS[neighbor_count]
-    for coords, node in nodes.items():
+    for coords, node in coordinate_nodes.items():
 
         for coords2 in [Coords(*tuple(map(sum, zip(coords, delta)))) for delta in deltas]:
-            if coords2 in nodes.keys():
-                node.connect_directed(nodes[coords2])
+            if coords2 in coordinate_nodes.keys():
+                node.connect_directed(coordinate_nodes[coords2])
 
 
 def reset_nodes(nodes: List[Node]) -> None:
@@ -229,8 +232,8 @@ def get_shortest_distance_any(starting_node: Node, ending_type: Type[TType],
         node_count: maximum number of Nodes in a Queue
 
     Returns:
-        the distance between the given node and any Node of the given type,
-        or None if a route is not available
+        the distance between the given Node and any Node of the given type,
+        or None if a path is not available
     """
     starting_node.visited = True
     starting_node.distance = 0
@@ -259,7 +262,7 @@ def get_closest_any(starting_node: Node, ending_type: Type[TType],
 
     Returns:
         the closest Node corresponding to the given tile type from the starting
-        Node, or None if no route is available
+        Node, or None if no path is available
     """
     starting_node.visited = True
     starting_node.distance = 0
@@ -281,10 +284,10 @@ def get_nodes_on_shortest_paths_multiple(starting_nodes: List[Node], ending_type
                                          current_nodes: List[Node]) -> (Optional[Distances], Optional[Set[Node]]):
     """
     Find all the Nodes that are on a possible shortest path to the given tile
-    type, from all the given starting nodes.
+    type, from all the given starting coordinate_nodes.
 
     Args:
-        starting_nodes: a list of starting nodes
+        starting_nodes: a list of starting coordinate_nodes
         ending_type: a tile type to end a path on
         current_nodes: a list of Nodes currently in the graph which are
                        needed for resetting
@@ -398,7 +401,7 @@ def get_distances(starting_nodes: List[Node], ending_type: Type[TType],
 
     Returns:
         a Distances object with distances of each starting Node, or None
-        if even a single route is unavailable
+        if even a single path is unavailable
     """
     dists = Distances()
     node_count = len(current_nodes)
@@ -416,7 +419,7 @@ def get_maxmin_distance(starting_nodes: List[Node], ending_type: Type[TType],
                         current_nodes: List[Node]) -> Optional[int]:
     """
     Calculate and return the maxmin distance of a map. The value returned
-    is the greatest shortest distance between different spawn nodes.
+    is the greatest shortest distance between different starting Nodes.
 
     Args:
         starting_nodes: a list of starting Nodes
@@ -425,7 +428,7 @@ def get_maxmin_distance(starting_nodes: List[Node], ending_type: Type[TType],
                        needed for resetting
     Returns:
         the maxmin distance between the starting Nodes and Nodes corresponding
-        to the given tile type, or None if no route is available
+        to the given tile type, or None if no path is available
     """
     maxmin_distance = None
     node_count = len(current_nodes)
@@ -441,14 +444,14 @@ def get_maxmin_distance(starting_nodes: List[Node], ending_type: Type[TType],
 
 def get_cluster_of_nodes(current_node: Node) -> List[Node]:
     """
-    Recursively find a cluster of nodes that share the same node type. A cluster
-    contains one or more nodes where they are all connected via neighbors.
+    Recursively find a cluster of Nodes that share the same tile type. A cluster
+    contains one or more Nodes where they are all connected via neighbors.
 
     Args:
-        current_node: the current node whose neighbors are checked
+        current_node: the current Node whose neighbors are checked
 
     Returns:
-        a list of connected nodes, sharing the same tile type
+        a list of connected coordinate_nodes, sharing the same tile type
     """
     cluster = []
     current_node.visited = True
@@ -463,14 +466,14 @@ def get_cluster_of_nodes(current_node: Node) -> List[Node]:
 
 def get_center_coords(nodes: List[Node]) -> List[Coords]:
     """
-    Find coordinates of those nodes, who have neighbors of the same node type
+    Find coordinates of those Nodes, who have neighbors of the same tile type
     on both sides on any axis.
 
     Args:
-        nodes: a list of nodes to check
+        nodes: a list of Nodes to check
 
     Returns:
-        a list of coordinates equivalent to center nodes of a cluster
+        a list of coordinates equivalent to center Nodes of a cluster
     """
     center_coords = []
     for node in nodes:
@@ -492,14 +495,14 @@ def get_center_coords(nodes: List[Node]) -> List[Coords]:
 
 def get_surrounded_coords(nodes: List[Node]) -> List[Coords]:
     """
-    Find coordinates of those nodes, whose every neighbor has the same node
-    type as the node itself.
+    Find coordinates of those Nodes, whose every neighbor has the same tile
+    type as the Node itself.
 
     Args:
-        nodes: a list of nodes to check
+        nodes: a list of Nodes to check
 
     Returns:
-        a list of coordinates equivalent to surrounded nodes in a cluster
+        a list of coordinates equivalent to surrounded Nodes in a cluster
     """
     surrounded_coords = []
     for node in nodes:

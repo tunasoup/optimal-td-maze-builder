@@ -1,5 +1,3 @@
-from typing import List
-
 from tiles.tile_type import TTYPES
 
 
@@ -18,7 +16,7 @@ class Colorer:
                     'spawn': '#ff0000',
                     'exit': '#00ff00',
                     'occupied': '#6e1fa6',
-                    'route': '#f7ed23',
+                    'path': '#f7ed23',
                     # 'tower': '#c716de',
                 },
                 'background': 'transparent',
@@ -28,13 +26,13 @@ class Colorer:
             'Sanctum 2': {
                 'ttypes': {
                     'basic': '#0a304f',
-                    'unbuildable': '#6c7478',# and '#54585a',
+                    'unbuildable': '#6c7478',  # and '#54585a',
                     'void': 'transparent',
                     'spawn': '#a6442f',
                     'exit': '#86a0ba',
                     'occupied': '#0561d0',
-                    'route': '#fe5400',
-                    #'tower': '#6bc614',
+                    'path': '#fe5400',
+                    # 'tower': '#6bc614',
                 },
                 'background': '#141f2d',
                 'outline': '#ffffff',

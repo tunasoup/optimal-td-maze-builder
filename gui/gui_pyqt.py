@@ -1,5 +1,5 @@
 import threading
-from typing import Type
+from typing import Type, Dict
 
 import numpy as np
 from PyQt5.QtCore import Qt
@@ -10,10 +10,12 @@ from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
 
 from builders import CutoffBuilder, NaiveBuilder
 from gui.colorer import Colorer
-from tiles.tile import Tile
+from tiles.tile import Tile, Coords
 from tiles.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE, \
     TTypeOccupied, TTypeBasic
 from utils.errors import ValidationError
+from utils.graph_algorithms import tiles_to_nodes, Node, \
+    connect_all_neighboring_nodes
 from utils.map_validation import MapValidator
 
 DEFAULT_SIZE = 6
@@ -82,6 +84,9 @@ class Window(QMainWindow):
 
         self.setGeometry(300, 300, 600, 400)
         self.setWindowTitle("TD maze builder")
+
+        self.neighbor_group = QActionGroup(self)
+        self.color_profile_group = QActionGroup(self)
 
         self.create_menubar()
 
@@ -156,7 +161,7 @@ class Window(QMainWindow):
         menubar = self.menuBar()
         self.add_maze_menu(menubar)
         self.add_options_menu(menubar)
-        #self.add_help_menu(menubar)
+        # self.add_help_menu(menubar)
 
     def add_maze_menu(self, menubar: QMenuBar) -> None:
         maze_menu = QMenu('Maze', self)
@@ -208,13 +213,12 @@ class Window(QMainWindow):
 
     def add_neighbors_submenu(self, parent_menu: QMenu) -> None:
         """
-        Add a submenu in which the number of neighbors for a node is selected.
+        Add a submenu in which the number of neighbors for a Node is selected.
 
         Args:
             parent_menu: a QMenu that this submenu is part of
         """
         neighbors_submenu = parent_menu.addMenu('Neigbors')
-        self.neighbor_group = QActionGroup(self)
 
         for count in [4, 8]:
             neighbor_action = QAction(str(count), self)
@@ -232,7 +236,6 @@ class Window(QMainWindow):
             parent_menu: a QMenu that this submenu is part of
         """
         color_profile_submenu = parent_menu.addMenu('Color Profile')
-        self.color_profile_group = QActionGroup(self)
 
         for color_profile_name in self.colorer.color_profile_names:
             color_profile_action = QAction(color_profile_name, self)
@@ -316,7 +319,7 @@ class Window(QMainWindow):
 
     def build_from_tiles(self, tiles) -> None:
         """
-        Build a rectangle area of TileWidgets with given tiles.
+        Build a rectangle area of TileWidgets with given coordinated_nodes.
         """
         self.clear_map()
         self.variation_box.setDisabled(True)
@@ -380,23 +383,25 @@ class Window(QMainWindow):
         """
         neighbor_count = int(self.neighbor_group.checkedAction().text())
         tiles = self.get_tiles()
-        if self.initiate_map_validation(tiles, neighbor_count):
-            self.initiate_optimal_mazing(tiles, neighbor_count)
+        coordinated_nodes = tiles_to_nodes(tiles)
+        connect_all_neighboring_nodes(coordinated_nodes, neighbor_count)
 
-    def initiate_map_validation(self, tiles: np.ndarray, neighbor_count: int) -> bool:
+        if self.initiate_map_validation(np.array(list(coordinated_nodes.values())),):
+            self.initiate_optimal_mazing(coordinated_nodes)
+
+    def initiate_map_validation(self, nodes: np.ndarray) -> bool:
         """
         Initiate the map validation.
 
         Args:
-            tiles: an array of Tiles
-            neighbor_count: the number of neighbors a Node can have
+            nodes: an array of Nodes
 
         Returns:
             True if the map is valid, else False
         """
         print('\nValidating map ...')
         try:
-            self.map_validator.validate_map(tiles, neighbor_count)
+            self.map_validator.validate_map(nodes)
             print(f'Map validation successful!')
             return True
         except ValidationError as e:
@@ -404,21 +409,20 @@ class Window(QMainWindow):
             self.disable_buttons(False)
             return False
 
-    def initiate_optimal_mazing(self, tiles: np.ndarray, neighbor_count: int) -> None:
+    def initiate_optimal_mazing(self, coordinated_nodes: Dict[Coords, Node]) -> None:
         """
         Initiate the optimal mazing, and show one of the solutions.
 
         Args:
-            tiles: an array of Tiles
-            neighbor_count: the number of neighbors a Node can have
+            coordinated_nodes: a dictionary with Coords as keys and Nodes as values
         """
         print('\nGenerating optimal maze ...')
         tower_limit = None
         if self.tower_limiter.isChecked():
             tower_limit = self.tower_limit_box.value()
 
-        #builder = NaiveBuilder(tiles, neighbor_count, tower_limit)
-        builder = CutoffBuilder(tiles, neighbor_count, tower_limit)
+        # builder = NaiveBuilder(coordinated_nodes, tower_limit)
+        builder = CutoffBuilder(coordinated_nodes, tower_limit)
         self.best_tower_coords = builder.generate_optimal_mazes()
 
         if self.best_tower_coords:
@@ -432,7 +436,7 @@ class Window(QMainWindow):
             if self.variation_box.value() == index + 1:
                 self.show_variation(index)
             self.variation_box.setValue(index + 1)  # TODO Has a chance to crash
-            # todo: after changing a variation and tiles and running
+            # todo: after changing a variation and coordinated_nodes and running
             self.variation_box.setDisabled(False)
             print('\nMaze generated!')
 
