@@ -19,6 +19,7 @@ class TTypeBasic(TType):
     is_traversable = True
     is_spawn = False
     is_exit = False
+    color = '#a16b55'
 
 
 class TTypeUnbuildable(TType):
@@ -28,6 +29,7 @@ class TTypeUnbuildable(TType):
     is_traversable = True
     is_spawn = False
     is_exit = False
+    color = '#6e3b27'
 
 
 class TTypeVoid(TType):
@@ -37,6 +39,7 @@ class TTypeVoid(TType):
     is_traversable = False
     is_spawn = False
     is_exit = False
+    color = 'transparent'
 
 
 class TTypeSpawn(TType):
@@ -46,6 +49,7 @@ class TTypeSpawn(TType):
     is_traversable = True
     is_spawn = True
     is_exit = False
+    color = '#ff0000'
 
 
 class TTypeExit(TType):
@@ -55,6 +59,7 @@ class TTypeExit(TType):
     is_traversable = True
     is_spawn = False
     is_exit = True
+    color = '#00ff00'
 
 
 class TTypeOccupied(TType):
@@ -64,6 +69,7 @@ class TTypeOccupied(TType):
     is_traversable = False
     is_spawn = False
     is_exit = False
+    color = '#6e1fa6'
 
 
 class TTypePath(TType):
@@ -73,6 +79,7 @@ class TTypePath(TType):
     is_traversable = True
     is_spawn = False
     is_exit = False
+    color = '#f7ed23'
 
 
 TTYPES = {

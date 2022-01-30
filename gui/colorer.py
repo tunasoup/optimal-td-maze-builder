@@ -10,14 +10,14 @@ class Colorer:
 
             'Default': {
                 'ttypes': {
-                    'basic': '#a16b55',
-                    'unbuildable': '#6e3b27',
-                    'void': 'transparent',
-                    'spawn': '#ff0000',
-                    'exit': '#00ff00',
-                    'occupied': '#6e1fa6',
-                    'path': '#f7ed23',
-                    # 'tower': '#c716de',
+                    'basic': TTYPES['basic'].color,
+                    'unbuildable': TTYPES['unbuildable'].color,
+                    'void': TTYPES['void'].color,
+                    'spawn': TTYPES['spawn'].color,
+                    'exit': TTYPES['exit'].color,
+                    'occupied': TTYPES['occupied'].color,
+                    'path': TTYPES['path'].color,
+                    # 'tower': TTYPES['basic'].color,
                 },
                 'background': 'transparent',
                 'outline': '#ffffff',
