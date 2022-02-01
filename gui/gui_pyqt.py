@@ -2,17 +2,17 @@ import threading
 from typing import Type, Dict
 
 import numpy as np
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QPalette, QMouseEvent, QColor
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox, QCheckBox, QMenu, QAction, QMenuBar, \
-    QActionGroup, QFileDialog
+    QActionGroup, QFileDialog, QDockWidget, QHBoxLayout, QVBoxLayout
 
 from builders import CutoffBuilder, NaiveBuilder
 from gui.colorer import Colorer
 from tiles.tile import Tile, Coords
 from tiles.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE, \
-    TTypeOccupied, TTypeBasic
+    TTypeOccupied, TTypeBasic, TTYPES
 from utils.errors import ValidationError
 from utils.graph_algorithms import tiles_to_nodes, Node, \
     connect_all_neighboring_nodes
@@ -22,14 +22,30 @@ DEFAULT_SIZE = 6
 MINIMUM_SIZE = 2
 
 
-class TileWidget(QWidget):
-    def __init__(self, tile: Tile):
-        super(TileWidget, self).__init__()
-
-        self.tile = tile
+class ColoredRectangle(QWidget):
+    def __init__(self, ttype: Type[TType]):
+        super(ColoredRectangle, self).__init__()
 
         self.setAutoFillBackground(True)
-        self.set_type_color(self.tile.ttype)
+        self.set_type_color(ttype)
+
+    def set_type_color(self, ttype: Type[TType]) -> None:
+        """
+        Set the ColoredRectangle's color to correspond with the given type
+
+        Args:
+            ttype: a tile type whose defined color is to be used
+        """
+        palette = self.palette()
+        palette.setColor(QPalette.Window, QColor(ttype.color))
+        self.setPalette(palette)
+
+
+class TileWidget(ColoredRectangle):
+    def __init__(self, tile: Tile):
+        super(TileWidget, self).__init__(tile.ttype)
+
+        self.tile = tile
 
     def rotate_type(self) -> None:
         """
@@ -56,23 +72,68 @@ class TileWidget(QWidget):
         self.tile.ttype = ttype
         self.set_type_color(ttype)
 
-    def set_type_color(self, ttype: Type[TType]) -> None:
-        """
-        Set the TileWidget's color to correspond with the given type
-
-        Args:
-            ttype: a tile type whose defined color is to be used
-        """
-        palette = self.palette()
-        palette.setColor(QPalette.Window, QColor(ttype.color))
-        self.setPalette(palette)
-
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.LeftButton:
             self.rotate_type()
 
         elif event.button() == Qt.RightButton:
             self.rotate_type_reverse()
+
+
+class SelectableTType(QWidget):
+    clicked = pyqtSignal(object)
+
+    def __init__(self, ttype: Type[TType]):
+        super(SelectableTType, self).__init__()
+
+        self.ttype = ttype
+        self.name = ttype.name
+
+        self.rectangle = ColoredRectangle(self.ttype)
+        self.rectangle.setFixedSize(20, 20)
+
+        layout = QHBoxLayout()
+        layout.addWidget(self.rectangle)
+        layout.addWidget(QLabel(self.name.capitalize()))
+        self.setLayout(layout)
+
+    def refresh_color(self) -> None:
+        self.rectangle.set_type_color(self.ttype)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(self.ttype)
+
+
+class TTypeContainer(QWidget):
+    ttype_clicked = pyqtSignal(object)
+
+    def __init__(self):
+        """
+        A widget that contains the all possible tile types.
+        """
+        super(TTypeContainer, self).__init__()
+
+        layout = QVBoxLayout()
+
+        ttypes = TTYPES.values()
+        self.selectable_ttypes = np.empty(len(ttypes), SelectableTType)
+
+        for idx, ttype in enumerate(ttypes):
+            selectable_ttype = SelectableTType(ttype)
+            selectable_ttype.clicked.connect(self.on_clicked)
+            self.selectable_ttypes[idx] = selectable_ttype
+            layout.addWidget(selectable_ttype)
+
+        self.setLayout(layout)
+
+    def refresh_selectable_ttype_colors(self) -> None:
+        for selectable_ttype in self.selectable_ttypes:
+            selectable_ttype.refresh_color()
+
+    @pyqtSlot(object)
+    def on_clicked(self, ttype: Type[TType]):
+        self.ttype_clicked.emit(ttype)
 
 
 class Window(QMainWindow):
@@ -157,10 +218,17 @@ class Window(QMainWindow):
         self.colorer.change_to_profile(color_profile_name)
         self.change_background_color(color_profile_name)
 
+        self.ttype_container = TTypeContainer()
+        self.ttype_container.ttype_clicked.connect(self.on_ttype_selection)
+        self.ttype_window = self.create_ttype_window(self.ttype_container)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.ttype_window)
+        self.selected_type: Type[TType] = TTypeBasic
+
     def create_menubar(self) -> None:
         menubar = self.menuBar()
         self.add_maze_menu(menubar)
         self.add_options_menu(menubar)
+        self.add_view_menu(menubar)
         # self.add_help_menu(menubar)
 
     def add_maze_menu(self, menubar: QMenuBar) -> None:
@@ -175,6 +243,7 @@ class Window(QMainWindow):
         export_action.triggered.connect(self.export_maze)
         maze_menu.addAction(export_action)
 
+    @pyqtSlot()
     def import_maze(self) -> None:
         """
         Import a saved maze.
@@ -188,6 +257,7 @@ class Window(QMainWindow):
             tiles = np_file[np_file.files[0]]
             self.build_from_tiles(tiles)
 
+    @pyqtSlot()
     def export_maze(self) -> None:
         """
         Save the current maze as a file.
@@ -258,6 +328,7 @@ class Window(QMainWindow):
         palette.setColor(QPalette.Window, QColor(color))
         self.grid_widget.setPalette(palette)
 
+    @pyqtSlot()
     def change_color_profile(self) -> None:
         """
         Change the colors of the GUI to the currently selected color profile.
@@ -266,9 +337,34 @@ class Window(QMainWindow):
         self.colorer.change_to_profile(color_profile_name)
         self.change_background_color(color_profile_name)
 
-        # Update current GUI
+        # Refresh the map colors
         for tile_widget in self.tile_widgets.flatten():
             tile_widget.set_type_color(tile_widget.tile.ttype)
+
+        # Refresh the ttype window colors
+        self.ttype_container.refresh_selectable_ttype_colors()
+
+    def add_view_menu(self, menubar: QMenuBar) -> None:
+        view_menu = QMenu('View', self)
+        menubar.addMenu(view_menu)
+
+        view_menu.addAction(self.create_ttype_window_action())
+
+    def create_ttype_window_action(self) -> QAction:
+        ttype_window_action = QAction('Type Window', self)
+        ttype_window_action.setCheckable(True)
+        ttype_window_action.setChecked(True)
+        ttype_window_action.triggered.connect(self.toggle_ttype_window)
+        return ttype_window_action
+
+    # todo: closing the ttype window (altf4, x) doesn't uncheck the action
+
+    @pyqtSlot()
+    def toggle_ttype_window(self) -> None:
+        if self.ttype_window.isHidden():
+            self.ttype_window.show()
+        else:
+            self.ttype_window.hide()
 
     def add_help_menu(self, menubar: QMenuBar) -> None:
         help_menu = QMenu('Help', self)
@@ -292,6 +388,19 @@ class Window(QMainWindow):
         # Todo
         print('clicked about')
 
+    def create_ttype_window(self, ttype_container: TTypeContainer) -> QDockWidget:
+        ttype_window = QDockWidget('Types', parent=self)
+        # Removes the close button, doesn't prevent alt+f4
+        # ttype_window.setFeatures(QDockWidget.DockWidgetFloatable | QDockWidget.DockWidgetMovable)
+        ttype_window.setWidget(ttype_container)
+        return ttype_window
+
+    @pyqtSlot(object)
+    def on_ttype_selection(self, ttype: Type[TType]) -> None:
+        self.selected_type = ttype
+        print(ttype.name.capitalize())
+
+    @pyqtSlot()
     def tower_limiter_clicked(self) -> None:
         self.tower_limit_box.setDisabled(not self.tower_limiter.isChecked())
 
@@ -357,9 +466,11 @@ class Window(QMainWindow):
             tiles[i] = tilew.tile
         return tiles
 
+    @pyqtSlot()
     def build_button_clicked(self) -> None:
         self.build()
 
+    @pyqtSlot()
     def run_button_clicked(self) -> None:
         self.disable_buttons(True)
         self.variation_box.setDisabled(True)
