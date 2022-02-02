@@ -1,5 +1,4 @@
 from abc import ABC
-from typing import Dict, Type
 
 
 class TType(ABC):
@@ -91,14 +90,3 @@ TTYPES = {
     'occupied': TTypeOccupied,
     'path': TTypePath,
 }
-
-TILE_ROTATION: Dict[Type[TType], Type[TType]] = {
-    TTypeBasic:         TTypeUnbuildable,
-    TTypeUnbuildable:   TTypeVoid,
-    TTypeVoid:          TTypeSpawn,
-    TTypeSpawn:         TTypeExit,
-    TTypeExit:          TTypeOccupied,
-    TTypeOccupied:      TTypeBasic,
-}
-
-TILE_ROTATION_REVERSE = dict((v, k) for k, v in TILE_ROTATION.items())

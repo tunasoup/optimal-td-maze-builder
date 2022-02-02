@@ -1,18 +1,18 @@
 import threading
-from typing import Type, Dict
+from typing import Type, Dict, List, Optional
 
 import numpy as np
-from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QPoint, QRect, QSize
 from PyQt5.QtGui import QPalette, QMouseEvent, QColor
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox, QCheckBox, QMenu, QAction, QMenuBar, \
-    QActionGroup, QFileDialog, QDockWidget, QHBoxLayout, QVBoxLayout
+    QActionGroup, QFileDialog, QDockWidget, QHBoxLayout, QVBoxLayout, \
+    QRubberBand
 
 from builders import CutoffBuilder, NaiveBuilder
 from gui.colorer import Colorer
 from tiles.tile import Tile, Coords
-from tiles.tile_type import TType, TILE_ROTATION, TILE_ROTATION_REVERSE, \
-    TTypeOccupied, TTypeBasic, TTYPES
+from tiles.tile_type import TType, TTypeOccupied, TTypeBasic, TTYPES
 from utils.errors import ValidationError
 from utils.graph_algorithms import tiles_to_nodes, Node, \
     connect_all_neighboring_nodes
@@ -47,20 +47,6 @@ class TileWidget(ColoredRectangle):
 
         self.tile = tile
 
-    def rotate_type(self) -> None:
-        """
-        Change the type of the Tile to the next in rotation
-        """
-        self.tile.ttype = TILE_ROTATION[self.tile.ttype]
-        self.set_type_color(self.tile.ttype)
-
-    def rotate_type_reverse(self) -> None:
-        """
-        Change the type of the Tile to the previous in rotation
-        """
-        self.tile.ttype = TILE_ROTATION_REVERSE[self.tile.ttype]
-        self.set_type_color(self.tile.ttype)
-
     def change_to_type(self, ttype: Type[TType]) -> None:
         """
         Change the type of the Tile to the given type
@@ -72,12 +58,137 @@ class TileWidget(ColoredRectangle):
         self.tile.ttype = ttype
         self.set_type_color(ttype)
 
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.LeftButton:
-            self.rotate_type()
 
-        elif event.button() == Qt.RightButton:
-            self.rotate_type_reverse()
+class MapWidget(QWidget):
+    def __init__(self):
+        """
+        The map area of the GUI, which is responsible for adding, changing,
+        removing, and showing TileWidgets, and handling their mouse events.
+        """
+        super(MapWidget, self).__init__()
+
+        self.setAutoFillBackground(True)
+        self.map_grid = QGridLayout(self)
+        self.spacing = 1
+        self.map_grid.setSpacing(self.spacing)
+
+        self.selected_ttype: Type[TType] = TTypeBasic
+        self.start_point = QPoint()
+        self.end_point = QPoint()
+        self.rubber_band = QRubberBand(QRubberBand.Rectangle, self)
+        self.selected_widgets: List[TileWidget] = []
+
+    def change_background_color(self, color) -> None:
+        palette = self.palette()
+        palette.setColor(QPalette.Window, QColor(color))
+        self.setPalette(palette)
+
+    def add_tile_widget(self, tile_widget: TileWidget):
+        y = tile_widget.tile.y
+        x = tile_widget.tile.x
+        self.map_grid.addWidget(tile_widget, y, x)
+
+    def remove_tile_widget(self, tile_widget: TileWidget):
+        self.map_grid.removeWidget(tile_widget)
+
+    def clear_selection(self) -> None:
+        for tile_widget in self.selected_widgets:
+            pass
+            #todo tile_widget.toggle_highlight()
+        self.selected_widgets.clear()
+
+    @pyqtSlot(object)
+    def on_ttype_selection(self, ttype: Type[TType]) -> None:
+        self.selected_ttype = ttype
+
+    @pyqtSlot(QMouseEvent)
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.LeftButton:
+            self.left_button_clicked(event)
+        if event.button() == Qt.RightButton:
+            self.right_button_clicked(event)
+
+    def get_clicked_tile_widget(self, pos: QPoint) -> Optional[TileWidget]:
+        """
+        Get the TileWidget which resides in the given position.
+
+        Args:
+            pos: a pixel position relevant to the MapWidget
+
+        Returns:
+            a TileWidget in the given position if there is one, otherwise None
+        """
+        tile_widgets = (self.map_grid.itemAt(i).widget() for i in
+                        range(self.map_grid.count()))
+        for tile_widget in tile_widgets:
+            if pos in tile_widget.geometry():
+                return tile_widget
+        return None
+
+    def select_tile_widgets_in_area(self, selection_area: QRect) -> None:
+        """
+        Mark all the TileWidgets which intersect with the given area as
+        selected.
+
+        Args:
+            selection_area: a rectangle area in the MapWidget
+        """
+        tile_widgets = (self.map_grid.itemAt(i).widget() for i in
+                        range(self.map_grid.count()))
+        for tile_widget in tile_widgets:
+            if tile_widget.geometry().intersects(selection_area):
+                self.selected_widgets.append(tile_widget)
+                # todo tile_widget.toggle_highlight()
+
+    def left_button_clicked(self, event: QMouseEvent) -> None:
+        tile_widget = self.get_clicked_tile_widget(event.pos())
+        if tile_widget:
+
+            # If a selection exists and it was left clicked, fill
+            if self.selected_widgets and tile_widget in self.selected_widgets:
+                for selected_widget in self.selected_widgets:
+                    selected_widget.change_to_type(self.selected_ttype)
+
+            # Change the type of the clicked tile
+            elif not self.selected_widgets:
+                tile_widget.change_to_type(self.selected_ttype)
+
+        self.clear_selection()
+
+    def right_button_clicked(self, event: QMouseEvent):
+        self.start_point = QPoint(event.pos())
+        self.rubber_band.setGeometry(QRect(self.start_point, QSize()))
+        self.rubber_band.show()
+
+    @pyqtSlot(QMouseEvent)
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if event.buttons() == Qt.RightButton:
+            self.right_button_moved(event)
+
+    def right_button_moved(self, event: QMouseEvent) -> None:
+        if not self.start_point.isNull():
+            # Update the Rubberband
+            self.end_point = event.pos()
+            self.rubber_band.setGeometry(QRect(self.start_point, self.end_point).normalized())
+
+    @pyqtSlot(QMouseEvent)
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.RightButton:
+            self.right_button_released(event)
+
+    def right_button_released(self, event: QMouseEvent) -> None:
+        # Update the Rubberband
+        self.end_point = QPoint(event.pos())
+        self.rubber_band.setGeometry(QRect(self.start_point, self.end_point).normalized())
+        self.rubber_band.hide()
+
+        # Clear selection on right click (+ small jitter threshold)
+        if (self.end_point - self.start_point).manhattanLength() < 2:
+            self.clear_selection()
+
+        # Create a selection
+        else:
+            self.select_tile_widgets_in_area(self.rubber_band.geometry())
 
 
 class SelectableTType(QWidget):
@@ -153,12 +264,8 @@ class Window(QMainWindow):
 
         main_layout = QGridLayout()
 
-        # Layout for the map
-        self.grid_widget = QWidget()
-        self.grid_widget.setAutoFillBackground(True)
-        self.map_grid = QGridLayout(self.grid_widget)
-        self.map_grid.setSpacing(1)
-        main_layout.addWidget(self.grid_widget, 0, 0, -1, 3)
+        self.map_widget = MapWidget()
+        main_layout.addWidget(self.map_widget, 0, 0, -1, 3)
 
         # Layout for the parameters
         info_widget = QWidget()
@@ -219,10 +326,9 @@ class Window(QMainWindow):
         self.change_background_color(color_profile_name)
 
         self.ttype_container = TTypeContainer()
-        self.ttype_container.ttype_clicked.connect(self.on_ttype_selection)
         self.ttype_window = self.create_ttype_window(self.ttype_container)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.ttype_window)
-        self.selected_type: Type[TType] = TTypeBasic
+        self.ttype_container.ttype_clicked.connect(self.map_widget.on_ttype_selection)
 
     def create_menubar(self) -> None:
         menubar = self.menuBar()
@@ -324,9 +430,7 @@ class Window(QMainWindow):
             color_profile_name: the name of a color profile
         """
         color = self.colorer.get_background_color(color_profile_name)
-        palette = self.grid_widget.palette()
-        palette.setColor(QPalette.Window, QColor(color))
-        self.grid_widget.setPalette(palette)
+        self.map_widget.change_background_color(color)
 
     @pyqtSlot()
     def change_color_profile(self) -> None:
@@ -423,7 +527,7 @@ class Window(QMainWindow):
             for y in range(height):
                 tile = Tile(x=x, y=y)
                 tilew = TileWidget(tile)
-                self.map_grid.addWidget(tilew, y, x)
+                self.map_widget.add_tile_widget(tilew)
                 self.tile_widgets[x, y] = tilew
 
     def build_from_tiles(self, tiles) -> None:
@@ -444,7 +548,7 @@ class Window(QMainWindow):
         for tile in tiles:
             tilew = TileWidget(tile)
             x, y = tile.x, tile.y
-            self.map_grid.addWidget(tilew, y, x)
+            self.map_widget.add_tile_widget(tilew)
             self.tile_widgets[x, y] = tilew
 
     def clear_map(self) -> None:
@@ -456,7 +560,7 @@ class Window(QMainWindow):
             return
 
         for tilew in self.tile_widgets.flatten():
-            self.map_grid.removeWidget(tilew)
+            self.map_widget.remove_tile_widget(tilew)
 
         self.best_tower_coords = []
 
