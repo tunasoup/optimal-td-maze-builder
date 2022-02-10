@@ -1,9 +1,10 @@
 import threading
-from typing import Type, Dict, List, Optional
+from typing import Type, Dict, List, Optional, Tuple, NamedTuple, Deque
+from collections import deque
 
 import numpy as np
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QPoint, QRect, QSize
-from PyQt5.QtGui import QPalette, QMouseEvent, QColor
+from PyQt5.QtGui import QPalette, QMouseEvent, QColor, QKeySequence
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox, QCheckBox, QMenu, QAction, QMenuBar, \
     QActionGroup, QFileDialog, QDockWidget, QHBoxLayout, QVBoxLayout, \
@@ -20,6 +21,12 @@ from utils.map_validation import MapValidator
 
 DEFAULT_SIZE = 6
 MINIMUM_SIZE = 2
+
+
+class TTypeChange(NamedTuple):
+    widget: QWidget
+    old_ttype: Type[TType]
+    new_ttype: Type[TType]
 
 
 class ColoredRectangle(QWidget):
@@ -71,6 +78,8 @@ class TileWidget(ColoredRectangle):
 
 
 class MapWidget(QWidget):
+    action_created = pyqtSignal(object)
+
     def __init__(self):
         """
         The map area of the GUI, which is responsible for adding, changing,
@@ -111,6 +120,11 @@ class MapWidget(QWidget):
     @pyqtSlot(object)
     def on_ttype_selection(self, ttype: Type[TType]) -> None:
         self.selected_ttype = ttype
+
+    @pyqtSlot(object)
+    def on_action_received(self, widgets_and_ttypes: List[Tuple]) -> None:
+        for widget, ttype in widgets_and_ttypes:
+            widget.change_to_type(ttype)
 
     @pyqtSlot(QMouseEvent)
     def mousePressEvent(self, event: QMouseEvent) -> None:
@@ -153,18 +167,28 @@ class MapWidget(QWidget):
 
     def left_button_clicked(self, event: QMouseEvent) -> None:
         tile_widget = self.get_clicked_tile_widget(event.pos())
+        action: List[TTypeChange] = []
         if tile_widget:
 
             # If a selection exists and it was left clicked, fill
             if self.selected_widgets and tile_widget in self.selected_widgets:
                 for selected_widget in self.selected_widgets:
+                    old_ttype = selected_widget.tile.ttype
+                    if old_ttype == self.selected_ttype:
+                        continue
                     selected_widget.change_to_type(self.selected_ttype)
+                    action.append(TTypeChange(selected_widget, old_ttype, self.selected_ttype))
 
             # Change the type of the clicked tile
             elif not self.selected_widgets:
-                tile_widget.change_to_type(self.selected_ttype)
+                old_ttype = tile_widget.tile.ttype
+                if not old_ttype == self.selected_ttype:
+                    tile_widget.change_to_type(self.selected_ttype)
+                    action.append(TTypeChange(tile_widget, old_ttype, self.selected_ttype))
 
         self.clear_selection()
+        if action:
+            self.action_created.emit(action)
 
     def right_button_clicked(self, event: QMouseEvent):
         self.start_point = QPoint(event.pos())
@@ -277,12 +301,58 @@ class TTypeContainer(QWidget):
         self.ttype_clicked.emit(selectable_ttype.ttype)
 
 
+class ActionLogger(QWidget):
+    do_action = pyqtSignal(object)
+
+    def __init__(self):
+        """
+        Logs TType changes of TilesWidgets for undo and redo purposes.
+        """
+        super(ActionLogger, self).__init__()
+        maximum_actions_logged = 10
+        self.undo_stack: Deque[List[TTypeChange]] = deque(maxlen=maximum_actions_logged)
+        self.redo_stack: Deque[List[TTypeChange]] = deque(maxlen=maximum_actions_logged)
+
+    @pyqtSlot(object)
+    def log_action(self, action):
+        self.redo_stack.clear()
+        if len(self.undo_stack) == self.undo_stack.maxlen:
+            self.undo_stack.popleft()
+
+        self.undo_stack.append(action)
+
+    def undo(self):
+        if not self.undo_stack:
+            return
+
+        action = self.undo_stack.pop()
+        self.redo_stack.append(action)
+        widgets_and_ttypes = [(ttype_change.widget, ttype_change.old_ttype) for
+                              ttype_change in action]
+        self.do_action.emit(widgets_and_ttypes)
+
+    def redo(self):
+        if not self.redo_stack:
+            return
+
+        action = self.redo_stack.pop()
+        self.undo_stack.append(action)
+        widgets_and_ttypes = [(ttype_change.widget, ttype_change.new_ttype) for
+                              ttype_change in action]
+        self.do_action.emit(widgets_and_ttypes)
+
+    def clear(self) -> None:
+        self.undo_stack.clear()
+        self.redo_stack.clear()
+
+
 class Window(QMainWindow):
     def __init__(self, map_validator: MapValidator):
         super().__init__()
 
         self.map_validator = map_validator
         self.colorer = Colorer()
+        self.logger = ActionLogger()
 
         self.setGeometry(300, 300, 600, 400)
         self.setWindowTitle("TD maze builder")
@@ -295,6 +365,8 @@ class Window(QMainWindow):
         main_layout = QGridLayout()
 
         self.map_widget = MapWidget()
+        self.map_widget.action_created.connect(self.logger.log_action)
+        self.logger.do_action.connect(self.map_widget.on_action_received)
         main_layout.addWidget(self.map_widget, 0, 0, -1, 3)
 
         # Layout for the parameters
@@ -360,9 +432,12 @@ class Window(QMainWindow):
         self.addDockWidget(Qt.LeftDockWidgetArea, self.ttype_window)
         self.ttype_container.ttype_clicked.connect(self.map_widget.on_ttype_selection)
 
+        self.setFocus()
+
     def create_menubar(self) -> None:
         menubar = self.menuBar()
         self.add_maze_menu(menubar)
+        self.add_edit_menu(menubar)
         self.add_options_menu(menubar)
         self.add_view_menu(menubar)
         # self.add_help_menu(menubar)
@@ -409,6 +484,26 @@ class Window(QMainWindow):
         if file_path:
             print(file_path)
             np.savez_compressed(file_path, tiles)
+
+    def add_edit_menu(self, menubar: QMenuBar) -> None:
+        edit_menu = QMenu('Edit', self)
+        menubar.addMenu(edit_menu)
+
+        undo_action = QAction('Undo', self)
+        undo_action.setShortcut(QKeySequence("Ctrl+z"))
+        undo_action.triggered.connect(self.on_undo)
+        edit_menu.addAction(undo_action)
+
+        redo_action = QAction('Redo', self)
+        redo_action.setShortcut(QKeySequence("Ctrl+Shift+z"))
+        redo_action.triggered.connect(self.on_redo)
+        edit_menu.addAction(redo_action)
+
+    def on_undo(self) -> None:
+        self.logger.undo()
+
+    def on_redo(self) -> None:
+        self.logger.redo()
 
     def add_options_menu(self, menubar: QMenuBar) -> None:
         options_menu = QMenu('Options', self)
@@ -529,11 +624,6 @@ class Window(QMainWindow):
         ttype_window.setWidget(ttype_container)
         return ttype_window
 
-    @pyqtSlot(object)
-    def on_ttype_selection(self, ttype: Type[TType]) -> None:
-        self.selected_type = ttype
-        print(ttype.name.capitalize())
-
     @pyqtSlot()
     def tower_limiter_clicked(self) -> None:
         self.tower_limit_box.setDisabled(not self.tower_limiter.isChecked())
@@ -582,17 +672,16 @@ class Window(QMainWindow):
             self.tile_widgets[x, y] = tilew
 
     def clear_map(self) -> None:
-        """
-        Clear the TileWidgets from the map grid.
-        """
-        # No clearing needed on the first run
+        self.logger.clear()
+        self.best_tower_coords = []
+
         if not self.tile_widgets.all():
             return
 
         for tilew in self.tile_widgets.flatten():
             self.map_widget.remove_tile_widget(tilew)
 
-        self.best_tower_coords = []
+        self.tile_widgets = None
 
     def get_tiles(self) -> np.ndarray:
         tiles = np.empty(np.size(self.tile_widgets), Tile)
@@ -603,14 +692,17 @@ class Window(QMainWindow):
     @pyqtSlot()
     def build_button_clicked(self) -> None:
         self.build()
+        self.setFocus()
 
     @pyqtSlot()
     def run_button_clicked(self) -> None:
         self.disable_buttons(True)
+        self.logger.clear()
         self.variation_box.setDisabled(True)
         t1 = threading.Thread(target=self.create_maze)
         t1.daemon = True
         t1.start()
+        self.setFocus()
 
     def disable_buttons(self, set_disable: bool) -> None:
         """
