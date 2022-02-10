@@ -7,7 +7,7 @@ from PyQt5.QtGui import QPalette, QMouseEvent, QColor
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox, QCheckBox, QMenu, QAction, QMenuBar, \
     QActionGroup, QFileDialog, QDockWidget, QHBoxLayout, QVBoxLayout, \
-    QRubberBand
+    QRubberBand,  QGraphicsBlurEffect
 
 from builders import CutoffBuilder, NaiveBuilder
 from gui.colorer import Colorer
@@ -28,6 +28,13 @@ class ColoredRectangle(QWidget):
 
         self.setAutoFillBackground(True)
         self.set_type_color(ttype)
+        self.highlight: bool = False
+
+        # todo better highlight system
+        highlight_effect = QGraphicsBlurEffect()
+        highlight_effect.setBlurRadius(4.0)
+        self.setGraphicsEffect(highlight_effect)
+        self.graphicsEffect().setEnabled(False)
 
     def set_type_color(self, ttype: Type[TType]) -> None:
         """
@@ -39,6 +46,10 @@ class ColoredRectangle(QWidget):
         palette = self.palette()
         palette.setColor(QPalette.Window, QColor(ttype.color))
         self.setPalette(palette)
+
+    def toggle_highlight(self) -> None:
+        self.highlight = not self.highlight
+        self.graphicsEffect().setEnabled(self.highlight)
 
 
 class TileWidget(ColoredRectangle):
@@ -94,7 +105,7 @@ class MapWidget(QWidget):
     def clear_selection(self) -> None:
         for tile_widget in self.selected_widgets:
             pass
-            #todo tile_widget.toggle_highlight()
+            tile_widget.toggle_highlight()
         self.selected_widgets.clear()
 
     @pyqtSlot(object)
@@ -138,7 +149,7 @@ class MapWidget(QWidget):
         for tile_widget in tile_widgets:
             if tile_widget.geometry().intersects(selection_area):
                 self.selected_widgets.append(tile_widget)
-                # todo tile_widget.toggle_highlight()
+                tile_widget.toggle_highlight()
 
     def left_button_clicked(self, event: QMouseEvent) -> None:
         tile_widget = self.get_clicked_tile_widget(event.pos())
@@ -213,7 +224,7 @@ class SelectableTType(QWidget):
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.LeftButton:
-            self.clicked.emit(self.ttype)
+            self.clicked.emit(self)
 
 
 class TTypeContainer(QWidget):
@@ -229,6 +240,7 @@ class TTypeContainer(QWidget):
 
         ttypes = TTYPES.values()
         self.selectable_ttypes = np.empty(len(ttypes), SelectableTType)
+        self.selected: Optional[SelectableTType] = None
 
         for idx, ttype in enumerate(ttypes):
             selectable_ttype = SelectableTType(ttype)
@@ -237,14 +249,32 @@ class TTypeContainer(QWidget):
             layout.addWidget(selectable_ttype)
 
         self.setLayout(layout)
+        self.set_first_selection()
+
+    def set_first_selection(self) -> None:
+        """
+        Set initially the first SelectableTType as selected. Only
+        meant to be called by the TTypeContainer constructor.
+        """
+        if not self.selectable_ttypes.all():
+            print('\nWarning: no selectable ttypes!\n')
+            return
+        selectable_ttype = self.selectable_ttypes[0]
+        selectable_ttype.rectangle.toggle_highlight()
+        self.selected = selectable_ttype
+        self.ttype_clicked.emit(selectable_ttype.ttype)
 
     def refresh_selectable_ttype_colors(self) -> None:
         for selectable_ttype in self.selectable_ttypes:
             selectable_ttype.refresh_color()
 
     @pyqtSlot(object)
-    def on_clicked(self, ttype: Type[TType]):
-        self.ttype_clicked.emit(ttype)
+    def on_clicked(self, selectable_ttype: SelectableTType):
+        if self.selected:
+            self.selected.rectangle.toggle_highlight()
+        selectable_ttype.rectangle.toggle_highlight()
+        self.selected = selectable_ttype
+        self.ttype_clicked.emit(selectable_ttype.ttype)
 
 
 class Window(QMainWindow):
