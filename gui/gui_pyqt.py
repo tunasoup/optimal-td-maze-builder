@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QActionGroup, QFileDialog, QDockWidget, QHBoxLayout, QVBoxLayout, \
     QRubberBand,  QGraphicsBlurEffect
 
-from builders import CutoffBuilder, NaiveBuilder
+from builders import CutoffBuilder, NaiveBuilder, QLearnBuilder
 from gui.colorer import Colorer
 from tiles.tile import Tile, Coords
 from tiles.tile_type import TType, TTypeOccupied, TTypeBasic, TTYPES
@@ -758,8 +758,13 @@ class Window(QMainWindow):
         if self.tower_limiter.isChecked():
             tower_limit = self.tower_limit_box.value()
 
-        # builder = NaiveBuilder(coordinated_nodes, tower_limit)
-        builder = CutoffBuilder(coordinated_nodes, tower_limit)
+        if tower_limit is None:
+            # Should only have a single spawn
+            builder = QLearnBuilder(coordinated_nodes, tower_limit)
+        else:
+            # builder = NaiveBuilder(coordinated_nodes, tower_limit)
+            builder = CutoffBuilder(coordinated_nodes, tower_limit)
+
         self.best_tower_coords = builder.generate_optimal_mazes()
 
         if self.best_tower_coords:
