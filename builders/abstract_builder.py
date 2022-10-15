@@ -11,7 +11,7 @@ class MazeBuilder(ABC):
     def __init__(self, coordinated_nodes: Dict[Coords, Node], tower_limit: Optional[int] = None):
         """
         An abstract maze builder class. The maze builders try to build the
-        optimal maze (longest possible paths with minimal resources) for a given map.
+        optimal maze (the longest possible paths with minimal resources) for a given map.
 
         Args:
             coordinated_nodes: the (Coords and) Nodes of the maze
@@ -40,9 +40,7 @@ class MazeBuilder(ABC):
     def clear_single_paths(self) -> None:
         """
         Remove a traversable path from the list of build coordinate_nodes, if it is the
-        only path that can be taken.
-        This reduces the number of combinations by ignoring
-        unsolvable mazes.
+        only path that can be taken. This reduces the number of combinations by ignoring unsolvable mazes.
         """
         unvisit_nodes(list(self.coordinated_traversables.values()))
 
@@ -52,7 +50,7 @@ class MazeBuilder(ABC):
                 continue
             node.visited = True
 
-            current_node = next(iter(neighbors))    # Get the only neighbor Node
+            current_node = next(iter(neighbors))  # Get the only neighbor Node
             if current_node.ttype.is_spawn or current_node.ttype.is_exit or current_node.visited:
                 continue
             if current_node.ttype.allow_building:
@@ -137,6 +135,6 @@ class MazeBuilder(ABC):
         Generate a maze where the shortest path is as long as possible.
 
         Returns:
-            a list of dictionaries with possibly modified traversable Nodes as values
+           a list of lists with Coordinates for the tower placements
         """
         raise NotImplementedError
