@@ -1,3 +1,4 @@
+import sys
 from time import perf_counter
 from typing import Dict, List, Set, Optional
 
@@ -21,7 +22,7 @@ class CutoffBuilder(MazeBuilder):
         self.processed_coordinates: Dict[int, Set[Coords]] = dict()
         self.combination_counter = 0
         self.first_node_counter = 0
-        self.first_nodes = 0
+        self.n_first_nodes = 0
         self.start_time = None
 
     def generate_optimal_mazes(self) -> List[List[Coords]]:
@@ -37,7 +38,7 @@ class CutoffBuilder(MazeBuilder):
             self.processed_coordinates[count] = set()
 
         self.cut_off_path([], self.max_towers)
-        print(f'Number of combinations checked: {self.combination_counter}')
+        print(f'\nNumber of combinations checked: {self.combination_counter}')
 
         return self.best_tower_coords
 
@@ -60,7 +61,7 @@ class CutoffBuilder(MazeBuilder):
         # On the first run of this function, count the number of Nodes (first coordinate_nodes)
         if towers_left == self.max_towers:
             buildable_first_nodes = [node for node in nodes if node.ttype.allow_building]
-            self.first_nodes = len(buildable_first_nodes)
+            self.n_first_nodes = len(buildable_first_nodes)
 
         # Unsolvable
         if not dists:
@@ -88,7 +89,7 @@ class CutoffBuilder(MazeBuilder):
             if not node.ttype.allow_building:
                 continue
 
-            node.ttype = TTypeOccupied  # place tower on node
+            node.ttype = TTypeOccupied  # Place a tower on Node
             self.cut_off_path(combination + [node.coords], towers_left - 1)
             node.ttype = TTypeBasic
 
@@ -100,6 +101,6 @@ class CutoffBuilder(MazeBuilder):
             # Verbose
             if towers_left == self.max_towers:  # Depth 0
                 self.first_node_counter += 1
-                end_time = perf_counter()
-                print(f'Time spent {end_time - self.start_time:.2f} seconds'
-                      f', first coordinate_nodes processed {self.first_node_counter}/{self.first_nodes}\n ')
+                out_print = (f'\rTime spent {perf_counter() - self.start_time:.2f} seconds'
+                             f', unique shortest Nodes processed {self.first_node_counter}/{self.n_first_nodes}')
+                print(out_print, end='', flush=True, file=sys.stdout)

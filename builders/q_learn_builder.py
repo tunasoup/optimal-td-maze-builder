@@ -2,6 +2,8 @@ import math
 from random import randint, random
 from typing import Dict, List, Set, Optional
 
+from tqdm import tqdm
+
 from builders import MazeBuilder
 from tiles.tile import Coords
 from utils.graph_algorithms import Node
@@ -215,8 +217,9 @@ class QLearnBuilder(MazeBuilder):
         Train the agent, ideally optimizing the Q-Table to have high values
         for actions that keep the agent away from goals and dead ends.
         """
+        print('Training ...')
         spawn_coords = self.spawn_nodes[0].coords
-        for idx in range(self.training_times):
+        for idx in tqdm(range(self.training_times), unit=' epoch'):
             self.blocked.clear()
 
             current_state = spawn_coords
@@ -242,8 +245,6 @@ class QLearnBuilder(MazeBuilder):
                             reward=self.reward_normal)
 
                 current_state = action
-
-            print(f'Trained {idx+1} / {self.training_times} times')
 
     def get_path(self) -> Optional[Set[Coords]]:
         """

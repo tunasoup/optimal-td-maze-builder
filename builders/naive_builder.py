@@ -1,5 +1,9 @@
 from itertools import combinations
+from math import comb
+from time import localtime, strftime
 from typing import Dict, List, Tuple, Optional
+
+from tqdm import tqdm
 
 from builders import MazeBuilder
 from tiles.tile import Coords
@@ -25,18 +29,16 @@ class NaiveBuilder(MazeBuilder):
         testing every combination.
 
         Returns:
-            a list of dictionaries with possibly modified traversable Nodes as values
+            a list of lists with Coordinates for the tower placements
         """
         # Go through all the possible tower counts to obtain the longest maze
         best_dists = None
         counter = 0
-        from time import perf_counter
+        print(f'Starting tests with towers from 0 to {self.max_towers}, '
+              f'start time {strftime("%H:%M:%S", localtime())}')
         while counter <= self.max_towers:
-            print(f'Testing combinations with {counter} towers')
-            start_time = perf_counter()
+            print(f'Testing combinations with {counter} towers ...')
             dists, best_tower_coords = self.get_best_tower_combinations(counter)
-            end_time = perf_counter()
-            print(f'{end_time - start_time:.2f} seconds\n')
 
             if not dists:
                 counter += 1
@@ -68,10 +70,19 @@ class NaiveBuilder(MazeBuilder):
         current_nodes = list(self.coordinated_traversables.values())
 
         combs = combinations(self.coordinated_build_nodes, tower_count)
+
+        n_combs = comb(len(self.coordinated_build_nodes), tower_count)
+        disable_bar = False
+        if n_combs < 1e5:  # Do not show the progress bar for small processes
+            disable_bar = True
+        t = tqdm(total=n_combs, unit=f' combinations', disable=disable_bar, position=0, leave=True, unit_scale=True)
+
         for combination in combs:
             reset_nodes(current_nodes)
             dists = self.calculate_maze_distances(self.spawn_nodes, self.coordinated_traversables, combination)
             self.revert_to_buildables(self.coordinated_traversables, combination)
+
+            t.update()
             if not dists:
                 continue
 
@@ -81,9 +92,11 @@ class NaiveBuilder(MazeBuilder):
             elif dists == best_dists:
                 best_tower_coords.append(list(combination))
 
+        t.close()
         return best_dists, best_tower_coords
 
-    def calculate_maze_distances(self, spawn_nodes: List[Node],
+    @staticmethod
+    def calculate_maze_distances(spawn_nodes: List[Node],
                                  current_nodes: Dict[Coords, Node],
                                  combination: Tuple[Coords]) -> Optional[Distances]:
         """
@@ -106,7 +119,8 @@ class NaiveBuilder(MazeBuilder):
 
         return dists
 
-    def revert_to_buildables(self, current_nodes: Dict[Coords, Node],
+    @staticmethod
+    def revert_to_buildables(current_nodes: Dict[Coords, Node],
                              combination: Tuple[Coords]) -> None:
         """
         Mark the given coordinates as buildables.
