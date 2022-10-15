@@ -1,6 +1,6 @@
 import threading
-from typing import Type, Dict, List, Optional, Tuple, NamedTuple, Deque
 from collections import deque
+from typing import Type, Dict, List, Optional, Tuple, NamedTuple, Deque
 
 import numpy as np
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QPoint, QRect, QSize
@@ -8,7 +8,7 @@ from PyQt5.QtGui import QPalette, QMouseEvent, QColor, QKeySequence
 from PyQt5.QtWidgets import QWidget, QMainWindow, QGridLayout, QFormLayout, \
     QLabel, QPushButton, QSpinBox, QCheckBox, QMenu, QAction, QMenuBar, \
     QActionGroup, QFileDialog, QDockWidget, QHBoxLayout, QVBoxLayout, \
-    QRubberBand,  QGraphicsBlurEffect
+    QRubberBand, QGraphicsBlurEffect, QComboBox
 
 from builders import CutoffBuilder, NaiveBuilder, QLearnBuilder
 from gui.colorer import Colorer
@@ -37,7 +37,6 @@ class ColoredRectangle(QWidget):
         self.set_type_color(ttype)
         self.highlight: bool = False
 
-        # todo better highlight system
         highlight_effect = QGraphicsBlurEffect()
         highlight_effect.setBlurRadius(4.0)
         self.setGraphicsEffect(highlight_effect)
@@ -353,6 +352,11 @@ class Window(QMainWindow):
         self.map_validator = map_validator
         self.colorer = Colorer()
         self.logger = ActionLogger()
+        self.builders = {
+            'Cut-off': CutoffBuilder,
+            'QLearn': QLearnBuilder,
+            'Naive': NaiveBuilder,
+        }
 
         self.setGeometry(300, 300, 600, 400)
         self.setWindowTitle("TD maze builder")
@@ -396,6 +400,12 @@ class Window(QMainWindow):
         self.tower_limit_box.setDisabled(True)
         info_layout.addRow(QLabel('Limit towers:'), self.tower_limiter)
         info_layout.addRow(QLabel('Tower count:'), self.tower_limit_box)
+
+        # Drop-down menu for selecting a Builder
+        self.builder_drop_down = QComboBox()
+        for builder in self.builders.keys():
+            self.builder_drop_down.addItem(builder)
+        info_layout.addRow(self.builder_drop_down)
 
         # Run button for initiating the maze construction
         run_button = QPushButton('Run')
@@ -610,11 +620,11 @@ class Window(QMainWindow):
         help_menu.addAction(about_action)
 
     def show_help(self):
-        # Todo
+        # todo: implement help
         print('clicked help')
 
     def show_about(self):
-        # Todo
+        # todo: implement about
         print('clicked about')
 
     def create_ttype_window(self, ttype_container: TTypeContainer) -> QDockWidget:
@@ -758,12 +768,8 @@ class Window(QMainWindow):
         if self.tower_limiter.isChecked():
             tower_limit = self.tower_limit_box.value()
 
-        if tower_limit is None:
-            # Should only have a single spawn
-            builder = QLearnBuilder(coordinated_nodes, tower_limit)
-        else:
-            # builder = NaiveBuilder(coordinated_nodes, tower_limit)
-            builder = CutoffBuilder(coordinated_nodes, tower_limit)
+        builder_class = self.builders[self.builder_drop_down.currentText()]
+        builder = builder_class(coordinated_nodes, tower_limit)
 
         self.best_tower_coords = builder.generate_optimal_mazes()
 
@@ -777,8 +783,7 @@ class Window(QMainWindow):
             index = 0
             if self.variation_box.value() == index + 1:
                 self.show_variation(index)
-            self.variation_box.setValue(index + 1)  # TODO Has a chance to crash
-            # todo: after changing a variation and coordinated_nodes and running
+            self.variation_box.setValue(index + 1)  # todo: changing variation and running again can cause crashing
             self.variation_box.setDisabled(False)
             print('\nMaze generated!')
 
